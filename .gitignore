@@ -18,3 +18,8 @@ wheels/
 
 # Archive
 archive/
+
+# Scripts
+scripts/generate_conference_deck.js
+
+Beyond_Token_Counting_Token_to_Value_Ladder*.pptx
