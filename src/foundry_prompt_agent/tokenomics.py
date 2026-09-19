@@ -59,3 +59,35 @@ def summarize_effectiveness(efficiency: dict, success_rate: float) -> dict:
         "cost_per_success": efficiency["cost_per_task"] / success_rate,
     }
 
+
+def summarize_accepted_work(efficiency: dict, accepted_work_rate: float) -> dict:
+    """Derive Accepted Work token economics from measured efficiency.
+
+    Accepted Work is a stricter signal than the behavior pass rate: an
+    interaction only counts when it satisfies the behavior rubric and every
+    mandatory guardrail. The `accepted_work_rate` is decided per interaction
+    upstream; this function only converts it into token economics. Zero
+    accepted work yields infinite unit costs.
+    """
+
+    accepted_work_units = accepted_work_rate * efficiency["tasks"]
+
+    if accepted_work_units <= 0:
+        return {
+            "accepted_work_rate": accepted_work_rate,
+            "accepted_work_units": 0.0,
+            "tokens_per_accepted_work": float("inf"),
+            "cost_per_accepted_work": float("inf"),
+        }
+
+    return {
+        "accepted_work_rate": accepted_work_rate,
+        "accepted_work_units": accepted_work_units,
+        "tokens_per_accepted_work": (
+            efficiency["tokens_per_task"] / accepted_work_rate
+        ),
+        "cost_per_accepted_work": (
+            efficiency["cost_per_task"] / accepted_work_rate
+        ),
+    }
+

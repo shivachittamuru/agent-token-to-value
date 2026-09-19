@@ -177,6 +177,68 @@ def get_pass_rate(run, evaluator_name: str) -> float:
     )
 
 
+def collect_accepted_work(
+    openai_client,
+    run,
+    *,
+    behavior_criterion: str = BEHAVIOR_CRITERION,
+    mandatory_guardrails: tuple[str, ...] = (SCOPE_CRITERION,),
+) -> dict:
+    """Determine Accepted Work per interaction from row-level results.
+
+    A row counts as Accepted Work only when the behavior rubric passes AND
+    every mandatory guardrail passes on that same row. Acceptance is decided
+    per interaction from Foundry's output items; aggregate pass-rate
+    multiplication is intentionally avoided because it is not a valid
+    Accepted Work metric.
+    """
+
+    output_items = openai_client.evals.runs.output_items.list(
+        eval_id=run.eval_id,
+        run_id=run.id,
+    )
+
+    rows = []
+    accepted = 0
+
+    for item in output_items:
+        passed_by_name = {
+            result.name: bool(result.passed)
+            for result in getattr(item, "results", []) or []
+        }
+
+        behavior_passed = passed_by_name.get(behavior_criterion, False)
+        guardrails_passed = all(
+            passed_by_name.get(name, False) for name in mandatory_guardrails
+        )
+        is_accepted = behavior_passed and guardrails_passed
+
+        if is_accepted:
+            accepted += 1
+
+        datasource_item = getattr(item, "datasource_item", None) or {}
+        rows.append(
+            {
+                "datasource_item_id": getattr(item, "datasource_item_id", None),
+                "name": datasource_item.get("name"),
+                "behavior_passed": behavior_passed,
+                "guardrails_passed": guardrails_passed,
+                "accepted": is_accepted,
+            }
+        )
+
+    attempted = len(rows)
+    rejected = attempted - accepted
+
+    return {
+        "attempted_interactions": attempted,
+        "accepted_interactions": accepted,
+        "rejected_interactions": rejected,
+        "accepted_work_rate": accepted / attempted if attempted else 0.0,
+        "rows": rows,
+    }
+
+
 def enforce_quality_gate(
     run,
     *,

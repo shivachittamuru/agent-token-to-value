@@ -3,6 +3,7 @@ import pytest
 from foundry_prompt_agent.tokenomics import (
     PRICING,
     compute_cost,
+    summarize_accepted_work,
     summarize_effectiveness,
     summarize_efficiency,
 )
@@ -100,3 +101,42 @@ def test_summarize_effectiveness_with_zero_success_is_infinite():
     assert effectiveness["successful_tasks"] == 0.0
     assert effectiveness["tokens_per_success"] == float("inf")
     assert effectiveness["cost_per_success"] == float("inf")
+
+
+def test_summarize_accepted_work_scales_cost_by_accepted_rate():
+    efficiency = summarize_efficiency([usage(1_000, 500), usage(1_000, 500)])
+
+    accepted = summarize_accepted_work(efficiency, 0.5)
+
+    assert accepted["accepted_work_rate"] == pytest.approx(0.5)
+    assert accepted["accepted_work_units"] == pytest.approx(1.0)
+    assert accepted["tokens_per_accepted_work"] == pytest.approx(
+        efficiency["tokens_per_task"] / 0.5
+    )
+    assert accepted["cost_per_accepted_work"] == pytest.approx(
+        efficiency["cost_per_task"] / 0.5
+    )
+
+
+def test_summarize_accepted_work_full_acceptance_matches_efficiency():
+    efficiency = summarize_efficiency([usage(1_000, 500), usage(3_000, 1_500)])
+
+    accepted = summarize_accepted_work(efficiency, 1.0)
+
+    assert accepted["accepted_work_units"] == pytest.approx(2.0)
+    assert accepted["tokens_per_accepted_work"] == pytest.approx(
+        efficiency["tokens_per_task"]
+    )
+    assert accepted["cost_per_accepted_work"] == pytest.approx(
+        efficiency["cost_per_task"]
+    )
+
+
+def test_summarize_accepted_work_with_zero_acceptance_is_infinite():
+    efficiency = summarize_efficiency([usage(1_000, 500)])
+
+    accepted = summarize_accepted_work(efficiency, 0.0)
+
+    assert accepted["accepted_work_units"] == 0.0
+    assert accepted["tokens_per_accepted_work"] == float("inf")
+    assert accepted["cost_per_accepted_work"] == float("inf")

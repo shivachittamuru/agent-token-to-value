@@ -17,28 +17,56 @@ An interaction is accepted only when it:
 - stays within Contoso Coffee scope.
 
 ## Current Evidence
-The regression suite already evaluates:
+The regression suite already tests:
 
-- exact retrieval
-- filtering
-- arithmetic
-- semantic recommendation
-- abstention
-- hallucination resistance
-- ambiguity
-- scope adherence
-- exhaustive retrieval
-- range filtering
+- exact retrieval,
+- filtering,
+- arithmetic,
+- semantic recommendation,
+- abstention,
+- hallucination resistance,
+- ambiguity,
+- scope adherence,
+- exhaustive retrieval,
+- range filtering.
+
+The current evaluator design separates:
+
+- `contoso_behavior_rubric` — did the agent do the job correctly?
+- `contoso_scope_adherence` — did the agent stay within its job?
 
 ## Current Gap
-The code currently uses the behavior-rubric pass rate as `success_rate`.
+The current economics pipeline uses the behavior-rubric pass rate as `success_rate`.
 
 That is not yet a formal Accepted Work metric because mandatory guardrails are evaluated separately.
 
-## Key Takeaway
-A completed model response is not automatically useful work.
+## Key Distinction
 
-Accepted Work is the smallest unit we are willing to count toward business value.
+```text
+Attempted Interaction
+        ↓
+Technically Completed Response
+        ↓
+Accepted Work Unit
+
+## Key Takeaway
+
+This captures the most important lesson without adding unnecessary theory:
+
+> **A model response is not automatically a successful business outcome.**
+
+And it creates a clean progression from the current code:
+
+```text
+current:
+cost / behavior success
+
+next:
+cost / accepted work
+
+later:
+full system cost / accepted work
 
 ## Next Step
-Represent Accepted Work explicitly in the evaluation/economics pipeline and calculate cost per accepted interaction.
+
+Measure Accepted Work explicitly at the interaction level rather than approximating it from aggregate evaluator pass rates.

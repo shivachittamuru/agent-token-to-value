@@ -9,7 +9,8 @@ load_dotenv()
 
 project_client = AIProjectClient(
     endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"],
-    credential=AzureCliCredential(),
+    # az.cmd can cold-start slower than the 10s default on Windows.
+    credential=AzureCliCredential(process_timeout=30),
 )
 
 openai_client = project_client.get_openai_client()

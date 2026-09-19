@@ -21,11 +21,13 @@ from foundry_prompt_agent.business_economics import (
 )
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
+    collect_accepted_work,
     enforce_quality_gate,
     get_pass_rate,
     run_cloud_evaluation,
 )
 from foundry_prompt_agent.tokenomics import (
+    summarize_accepted_work,
     summarize_effectiveness,
     summarize_efficiency,
 )
@@ -97,6 +99,23 @@ def print_effectiveness(summary: dict) -> None:
     print(f"Successful tasks: {summary['successful_tasks']:.1f}")
     print(f"Tokens per success: {summary['tokens_per_success']:,.1f}")
     print(f"Cost per success: ${summary['cost_per_success']:.6f}")
+
+
+def print_accepted_work(acceptance: dict, economics: dict) -> None:
+    print("\n=== Accepted Work ===")
+    print(f"Attempted interactions: {acceptance['attempted_interactions']}")
+    print(f"Accepted interactions: {acceptance['accepted_interactions']}")
+    print(f"Rejected interactions: {acceptance['rejected_interactions']}")
+    print(f"Accepted work rate: {acceptance['accepted_work_rate']:.1%}")
+    print(f"Accepted work units: {economics['accepted_work_units']:.1f}")
+    print(
+        f"Tokens per accepted work: "
+        f"{economics['tokens_per_accepted_work']:,.1f}"
+    )
+    print(
+        f"Cost per accepted work: "
+        f"${economics['cost_per_accepted_work']:.6f}"
+    )
 
 
 def print_business_economics(summary: dict) -> None:
@@ -212,6 +231,14 @@ def main() -> None:
         # 4. Quality-adjusted token efficiency.
         effectiveness = summarize_effectiveness(efficiency, success_rate)
         print_effectiveness(effectiveness)
+
+        # 4b. Accepted Work: per-interaction acceptance from row-level results.
+        openai_client = project_client.get_openai_client()
+        acceptance = collect_accepted_work(openai_client, run)
+        accepted_work = summarize_accepted_work(
+            efficiency, acceptance["accepted_work_rate"]
+        )
+        print_accepted_work(acceptance, accepted_work)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
