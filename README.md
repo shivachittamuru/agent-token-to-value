@@ -34,6 +34,18 @@ The core optimization goal is:
 
 ---
 
+## Project versions
+
+The original Token-to-Value implementation is preserved as the Git tag:
+
+`token-to-value-v1`
+
+Value-to-Action development continues on:
+
+`feature/value-to-action`
+
+---
+
 ## Overview
 
 The Contoso Coffee agent answers questions about a coffee-shop menu: prices, descriptions, filtering, budget math, recommendations, abstention when information is unavailable, and scope adherence.
