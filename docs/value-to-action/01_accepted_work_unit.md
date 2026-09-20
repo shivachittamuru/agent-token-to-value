@@ -48,6 +48,7 @@ Attempted Interaction
 Technically Completed Response
         ↓
 Accepted Work Unit
+```
 
 ## Key Takeaway
 
@@ -66,6 +67,7 @@ cost / accepted work
 
 later:
 full system cost / accepted work
+```
 
 ## Next Step
 
