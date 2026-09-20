@@ -127,12 +127,12 @@ def build_cost_components(record: dict) -> list[dict]:
         {
             "component": "azure_ai_search",
             "evidence_status": "usage_measured_unpriced",
-            "attribution_mode": "usage_based",
-            "cost_behavior": "variable",
+            "attribution_mode": "pending_pricing_model",
+            "cost_behavior": "unknown",
             "cost_usd": None,
             "note": (
                 f"tool_call_count={record.get('tool_call_count')}; "
-                "Search SKU/pricing model and allocation rule not yet known."
+                "Search pricing model/SKU and allocation rule not yet established."
             ),
         },
         {
@@ -196,4 +196,55 @@ def attribute_costs(record: dict) -> dict:
         "known_direct_execution_cost_usd": known_direct,
         "unknown_or_unallocated_components": unknown_or_unallocated,
         "cost_completeness": "partial" if unknown_or_unallocated else "complete",
+    }
+
+
+def summarize_execution_economics(
+    records: list[dict],
+    attributions: list[dict],
+) -> dict:
+    """Aggregate the defensible execution economics for one run.
+
+    Only known, directly attributed costs enter the numerator; measured tool
+    calls are aggregated separately as resource evidence and never converted
+    to dollars. Zero accepted work yields an infinite cost per accepted work
+    rather than hiding the failure. The result is intentionally never labelled
+    a full or total execution cost while any component stays unknown.
+    """
+
+    attempted = len(records)
+    accepted = sum(1 for record in records if record.get("accepted") is True)
+
+    known_direct = sum(
+        attribution["known_direct_execution_cost_usd"]
+        for attribution in attributions
+    )
+
+    measured_tool_calls = sum(
+        record["tool_call_count"]
+        for record in records
+        if record.get("tool_call_count") is not None
+    )
+
+    unknown_components = sorted(
+        {
+            component
+            for attribution in attributions
+            for component in attribution["unknown_or_unallocated_components"]
+        }
+    )
+
+    return {
+        "attempted_interactions": attempted,
+        "accepted_interactions": accepted,
+        "known_direct_execution_cost_usd": known_direct,
+        "known_direct_cost_per_attempt_usd": (
+            known_direct / attempted if attempted else 0.0
+        ),
+        "known_direct_cost_per_accepted_work_usd": (
+            known_direct / accepted if accepted else float("inf")
+        ),
+        "measured_tool_calls": measured_tool_calls,
+        "cost_completeness": "partial" if unknown_components else "complete",
+        "unknown_or_unallocated_components": unknown_components,
     }

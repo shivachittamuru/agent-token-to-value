@@ -124,13 +124,60 @@ Latency
 → evidenced economic effect
 ```
 
-### 13. Cost allocation is a decision model, not a physical truth
+## 13. Cost allocation is a decision model, not a physical truth
 
 Shared costs can often be allocated in several defensible ways.
 
 The allocation rule should match the decision being made and remain visible rather than being hidden inside a final number.
 
-## Key Takeaway
-The goal is not to create the largest possible cost model.
+## 14. Architecture determines the correct cost model
+The same functional capability may have very different economics depending on how it is provisioned.
 
-The goal is to include the right costs for the decision being made, while preserving what is measured, allocated, assumed, and unknown.
+A dedicated service may behave like fixed or step-function capacity.
+A serverless service may behave like usage-based consumption.
+
+Do not apply one pricing model to both.
+
+## 15. Known zero and Unknown are different
+A component can legitimately have no additional charge under a given architecture.
+
+That is different from lacking evidence.
+
+```text
+Known zero
+≠
+Unknown
+```
+
+## 16. A partial cost model should identify itself as partial
+
+If economically relevant components remain Unknown or unallocated, do not label the measured subset as total or full cost.
+
+Precision in naming is part of economic rigor.
+
+## 17. Cost completeness is itself evidence
+
+A workload can have an accurate measured model cost while still having incomplete execution economics.
+
+Decision confidence should depend not only on the number, but also on how complete the denominator is.
+
+## 18. Zero, Unknown, and Not Applicable are different economic states
+
+Do not collapse them.
+
+- **Zero** — evidence supports that no additional cost is attributed.
+- **Unknown** — the component matters, but cost evidence is incomplete.
+- **Not applicable** — the component is outside the workload/system design.
+
+These states imply different decisions.
+
+## 19. Cost completeness should travel with the number
+
+A cost number without its completeness state can be misleading.
+
+For example:
+
+```text
+Known direct execution cost = $0.007
+Cost completeness = partial
+```

@@ -21,7 +21,9 @@ from foundry_prompt_agent.business_economics import (
 )
 from foundry_prompt_agent.execution import (
     apply_acceptance,
+    attribute_costs,
     build_execution_records,
+    summarize_execution_economics,
 )
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
@@ -122,6 +124,32 @@ def print_execution_evidence(records: list[dict]) -> None:
         f"Tool-call evidence: "
         f"{'measured' if tool_evidence_measured else 'unavailable'}"
     )
+
+
+def print_execution_economics(summary: dict) -> None:
+    print("\n=== Execution Economics ===")
+    print(f"Attempted interactions: {summary['attempted_interactions']}")
+    print(f"Accepted work units: {summary['accepted_interactions']}")
+    print(
+        f"Known direct execution cost: "
+        f"${summary['known_direct_execution_cost_usd']:.6f}"
+    )
+    print(
+        f"Known direct cost / attempt: "
+        f"${summary['known_direct_cost_per_attempt_usd']:.6f}"
+    )
+    print(
+        f"Known direct cost / accepted work: "
+        f"${summary['known_direct_cost_per_accepted_work_usd']:.6f}"
+    )
+    print(f"Measured tool calls: {summary['measured_tool_calls']}")
+    print(f"Cost completeness: {summary['cost_completeness'].upper()}")
+
+    unknown = ", ".join(summary["unknown_or_unallocated_components"]) or "none"
+    print(f"Unknown / unallocated: {unknown}")
+
+    if summary["cost_completeness"] == "partial":
+        print("Full Execution Cost: NOT YET ESTABLISHED")
 
 
 def print_efficiency(summary: dict) -> None:
@@ -310,6 +338,15 @@ def main() -> None:
         )
         persist_execution_records(execution_records)
         print_execution_evidence(execution_records)
+
+        # 4d. Aggregate defensible execution economics (partial by design).
+        attributions = [
+            attribute_costs(record) for record in execution_records
+        ]
+        execution_economics = summarize_execution_economics(
+            execution_records, attributions
+        )
+        print_execution_economics(execution_economics)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)

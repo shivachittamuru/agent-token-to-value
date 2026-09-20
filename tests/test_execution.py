@@ -6,6 +6,7 @@ from foundry_prompt_agent.execution import (
     attribute_costs,
     build_execution_record,
     build_execution_records,
+    summarize_execution_economics,
 )
 from foundry_prompt_agent.tokenomics import compute_cost
 
@@ -204,3 +205,116 @@ def test_attribute_costs_not_labelled_full_execution_cost():
     assert "full_execution_cost_usd" not in attribution
     assert "full_execution_cost" not in attribution
     assert attribution["unknown_or_unallocated_components"]
+
+
+def economics_record(
+    *,
+    name: str,
+    accepted,
+    model_cost_usd: float = 0.001,
+    tool_call_count=1,
+) -> dict:
+    record = build_execution_record(
+        run_id="run1",
+        interaction_id=name,
+        case=case(name=name),
+        execution=execution(tool_call_count=tool_call_count),
+    )
+    return record | {
+        "accepted": accepted,
+        "model_cost_usd": model_cost_usd,
+    }
+
+
+def summarize(records: list[dict]) -> dict:
+    attributions = [attribute_costs(record) for record in records]
+    return summarize_execution_economics(records, attributions)
+
+
+def test_summarize_execution_economics_normal_accepted_case():
+    records = [
+        economics_record(name="a", accepted=True, model_cost_usd=0.001),
+        economics_record(name="b", accepted=True, model_cost_usd=0.003),
+    ]
+
+    summary = summarize(records)
+
+    assert summary["attempted_interactions"] == 2
+    assert summary["accepted_interactions"] == 2
+    assert summary["known_direct_execution_cost_usd"] == pytest.approx(0.004)
+    assert summary["known_direct_cost_per_attempt_usd"] == pytest.approx(0.002)
+    assert summary[
+        "known_direct_cost_per_accepted_work_usd"
+    ] == pytest.approx(0.002)
+
+
+def test_summarize_execution_economics_rejected_work_raises_cost_per_accepted():
+    records = [
+        economics_record(name="a", accepted=True, model_cost_usd=0.002),
+        economics_record(name="b", accepted=False, model_cost_usd=0.002),
+    ]
+
+    summary = summarize(records)
+
+    # Cost is incurred for both attempts but only one is accepted work.
+    assert summary["accepted_interactions"] == 1
+    assert summary["known_direct_cost_per_attempt_usd"] == pytest.approx(0.002)
+    assert summary[
+        "known_direct_cost_per_accepted_work_usd"
+    ] == pytest.approx(0.004)
+    assert (
+        summary["known_direct_cost_per_accepted_work_usd"]
+        > summary["known_direct_cost_per_attempt_usd"]
+    )
+
+
+def test_summarize_execution_economics_zero_accepted_is_infinite():
+    records = [
+        economics_record(name="a", accepted=False),
+        economics_record(name="b", accepted=None),
+    ]
+
+    summary = summarize(records)
+
+    assert summary["accepted_interactions"] == 0
+    assert summary["known_direct_cost_per_accepted_work_usd"] == float("inf")
+
+
+def test_summarize_execution_economics_aggregates_measured_tool_calls():
+    records = [
+        economics_record(name="a", accepted=True, tool_call_count=1),
+        economics_record(name="b", accepted=True, tool_call_count=2),
+        economics_record(name="c", accepted=True, tool_call_count=None),
+    ]
+
+    summary = summarize(records)
+
+    # Unknown tool evidence is skipped, not counted as zero dollars.
+    assert summary["measured_tool_calls"] == 3
+
+
+def test_summarize_execution_economics_unique_unknown_components():
+    records = [
+        economics_record(name="a", accepted=True),
+        economics_record(name="b", accepted=True),
+    ]
+
+    summary = summarize(records)
+
+    assert summary["unknown_or_unallocated_components"] == [
+        "azure_ai_search",
+        "human_recovery",
+        "observability",
+    ]
+
+
+def test_summarize_execution_economics_partial_has_no_full_cost_field():
+    records = [economics_record(name="a", accepted=True)]
+
+    summary = summarize(records)
+
+    assert summary["cost_completeness"] == "partial"
+    assert "full_execution_cost" not in summary
+    assert "full_execution_cost_usd" not in summary
+    assert "total_execution_cost_usd" not in summary
+    assert "total_customer_cost_usd" not in summary
