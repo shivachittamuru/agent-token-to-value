@@ -3,6 +3,7 @@ import pytest
 from foundry_prompt_agent.execution import (
     WORKLOAD_ID,
     apply_acceptance,
+    attribute_costs,
     build_execution_record,
     build_execution_records,
 )
@@ -131,3 +132,75 @@ def test_apply_acceptance_missing_evidence_stays_none():
 
     assert accepted_by_id["alpha"] is True
     assert accepted_by_id["beta"] is None
+
+
+def sample_record(model_cost_usd=0.0034025, tool_call_count=1) -> dict:
+    return build_execution_record(
+        run_id="run1",
+        interaction_id="exact_price",
+        case=case(),
+        execution=execution(tool_call_count=tool_call_count),
+    ) | {"model_cost_usd": model_cost_usd}
+
+
+def _component(attribution: dict, name: str) -> dict:
+    return next(
+        c for c in attribution["components"] if c["component"] == name
+    )
+
+
+def test_attribute_costs_includes_measured_model_cost():
+    record = sample_record(model_cost_usd=0.0034025)
+
+    attribution = attribute_costs(record)
+    model = _component(attribution, "model_inference")
+
+    assert model["evidence_status"] == "measured"
+    assert model["attribution_mode"] == "direct"
+    assert model["cost_usd"] == pytest.approx(0.0034025)
+    assert attribution["known_direct_execution_cost_usd"] == pytest.approx(
+        0.0034025
+    )
+
+
+def test_attribute_costs_keeps_search_cost_unknown():
+    record = sample_record(tool_call_count=3)
+
+    search = _component(attribute_costs(record), "azure_ai_search")
+
+    # Usage is preserved; per-call pricing is not invented.
+    assert search["cost_usd"] is None
+    assert "tool_call_count=3" in search["note"]
+    assert "azure_ai_search" in (
+        attribute_costs(record)["unknown_or_unallocated_components"]
+    )
+
+
+def test_attribute_costs_does_not_coerce_unknown_to_zero():
+    attribution = attribute_costs(sample_record())
+
+    for name in ("azure_ai_search", "observability", "human_recovery"):
+        assert _component(attribution, name)["cost_usd"] is None
+
+    assert set(attribution["unknown_or_unallocated_components"]) == {
+        "azure_ai_search",
+        "observability",
+        "human_recovery",
+    }
+
+
+def test_attribute_costs_runtime_has_no_additional_fee():
+    runtime = _component(attribute_costs(sample_record()), "foundry_agent_runtime")
+
+    assert runtime["cost_usd"] == 0.0
+    assert runtime["evidence_status"] == "no_additional_fee"
+
+
+def test_attribute_costs_not_labelled_full_execution_cost():
+    attribution = attribute_costs(sample_record())
+
+    # Known direct cost must not be mislabelled as a complete execution cost.
+    assert attribution["cost_completeness"] == "partial"
+    assert "full_execution_cost_usd" not in attribution
+    assert "full_execution_cost" not in attribution
+    assert attribution["unknown_or_unallocated_components"]

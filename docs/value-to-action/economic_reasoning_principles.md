@@ -81,6 +81,55 @@ Total Customer Cost versus Economic Value
 Expansion decision:
 Incremental Value versus Incremental Cost
 
+## 9. Telemetry is not economics
+Observing a resource does not automatically tell us its cost. For example, a tool-call count is evidence of activity, not necessarily a per-call dollar cost.
+
+```text
+Telemetry
++
+Pricing / Allocation Rule
++
+Decision Context
+=
+Economic Attribution
+```
+
+## 10. Average economics and incremental economics answer different decisions
+
+Average cost helps assess whether a workload is economically healthy.
+
+Incremental cost helps assess whether additional scale is attractive.
+
+A workload can have high average cost but low marginal cost, or the reverse.
+
+## 11. Some AI infrastructure costs are step-functions
+
+Infrastructure cost may stay flat across a range of usage and then jump when capacity must increase.
+
+Treating all infrastructure as smoothly variable can distort scaling decisions.
+
+## 12. Do not monetize a metric without a causal bridge
+
+Latency, retries, tool calls, and human touches may matter economically, but they should not be assigned a dollar value unless the relationship is defensible.
+
+Example:
+
+```text
+Latency
+≠
+Economic loss
+
+Latency
+→ lower conversion / SLA penalty / labor delay
+→ evidenced economic effect
+```
+
+### 13. Cost allocation is a decision model, not a physical truth
+
+Shared costs can often be allocated in several defensible ways.
+
+The allocation rule should match the decision being made and remain visible rather than being hidden inside a final number.
+
 ## Key Takeaway
 The goal is not to create the largest possible cost model.
 
