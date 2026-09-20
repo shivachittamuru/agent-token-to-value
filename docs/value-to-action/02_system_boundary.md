@@ -1,22 +1,22 @@
 # System Boundary — v1
 
 ## Decision Question
-What system components and resources are required to produce one Accepted Work Unit, and which costs should be attributed to that work?
+What complete system is required to produce one Accepted Work Unit, and which costs belong in its economics?
 
 ## Production Execution Path
 
 ```text
 Customer Inquiry
       ↓
-Foundry Prompt Agent
+Foundry Prompt Agent / Orchestration
       ↓
-GPT Model
+GPT Model Call(s)
       ↓
-Azure AI Search / Retrieval
+Azure AI Search / Tool Call(s)
       ↓
-Model Response
+Retrieved Context
       ↓
-Customer Response
+Final Response
       ↓
 Accepted Work
 ```

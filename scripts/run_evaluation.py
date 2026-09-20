@@ -19,6 +19,10 @@ from foundry_prompt_agent.business_economics import (
     load_business_assumptions,
     summarize_business_economics,
 )
+from foundry_prompt_agent.execution import (
+    apply_acceptance,
+    build_execution_records,
+)
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -34,6 +38,7 @@ from foundry_prompt_agent.tokenomics import (
 
 DATASET_PATH = Path("evals/contoso_agent_eval_v3.jsonl")
 RESULTS_PATH = Path("evals/results_v3.jsonl")
+EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -56,18 +61,20 @@ def load_dataset(path: Path) -> list[dict]:
         ]
 
 
-def generate_results() -> dict:
+def generate_results(run_id: str) -> tuple[dict, list[dict]]:
     cases = load_dataset(DATASET_PATH)
     usages = []
+    entries = []
 
     with RESULTS_PATH.open("w", encoding="utf-8") as output_file:
         for case in cases:
             print(f"Running agent: {case['name']}")
 
-            response, usage = ask_agent(case["query"])
-            usages.append(usage)
+            response, execution = ask_agent(case["query"])
+            usages.append(execution)
+            entries.append((case, execution))
 
-            # Foundry validates every uploaded field, so usage stays local.
+            # Foundry validates every uploaded field, so execution stays local.
             result = {
                 **case,
                 "response": response,
@@ -79,7 +86,42 @@ def generate_results() -> dict:
 
     efficiency = summarize_efficiency(usages)
     print_efficiency(efficiency)
-    return efficiency
+
+    # Execution Records start with acceptance unknown; joined post-evaluation.
+    execution_records = build_execution_records(run_id, entries)
+    return efficiency, execution_records
+
+
+def persist_execution_records(records: list[dict]) -> None:
+    with EXECUTION_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        for record in records:
+            output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved execution records to {EXECUTION_RECORDS_PATH}")
+
+
+def print_execution_evidence(records: list[dict]) -> None:
+    print("\n=== Execution Evidence ===")
+    print(f"Interactions: {len(records)}")
+
+    total_cost = sum(record["model_cost_usd"] for record in records)
+    print(f"Model cost: ${total_cost:.6f}")
+
+    latencies = [
+        record["latency_ms"]
+        for record in records
+        if record["latency_ms"] is not None
+    ]
+    average_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    print(f"Average latency: {average_latency:,.1f} ms")
+
+    tool_evidence_measured = records and all(
+        record["tool_call_count"] is not None for record in records
+    )
+    print(
+        f"Tool-call evidence: "
+        f"{'measured' if tool_evidence_measured else 'unavailable'}"
+    )
 
 
 def print_efficiency(summary: dict) -> None:
@@ -228,8 +270,8 @@ def main() -> None:
 
     run_id = build_run_id()
 
-    # 1. Run the agent against the regression dataset and measure token usage.
-    efficiency = generate_results()
+    # 1. Run the agent against the regression dataset and measure execution.
+    efficiency, execution_records = generate_results(run_id)
 
     # 2. Run Foundry evaluation to measure response quality.
     run = run_cloud_evaluation(
@@ -261,6 +303,13 @@ def main() -> None:
             attempted_interactions=acceptance["attempted_interactions"],
         )
         print_accepted_work(acceptance, accepted_work)
+
+        # 4c. Join acceptance onto Execution Records, persist, and summarize.
+        execution_records = apply_acceptance(
+            execution_records, acceptance["rows"]
+        )
+        persist_execution_records(execution_records)
+        print_execution_evidence(execution_records)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
