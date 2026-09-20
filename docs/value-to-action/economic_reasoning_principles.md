@@ -181,3 +181,174 @@ For example:
 Known direct execution cost = $0.007
 Cost completeness = partial
 ```
+
+## 20. Failed work still belongs in the numerator
+
+Resources consumed by rejected work do not disappear from the economics.
+
+```text
+Total Execution Consumption
+───────────────────────────
+Accepted Work Units
+```
+
+naturally makes failures increase the cost of useful production.
+
+Do not remove failed executions from the numerator merely because they produced no Accepted Work.
+
+## 21. Acceptance rate has an economic penalty
+
+When attempts have similar cost:
+
+```text
+Cost per Accepted Work
+≈
+Cost per Attempt
+───────────────
+Acceptance Rate
+```
+
+For example, a 90% acceptance rate makes the unit cost of useful work roughly 11.1% higher than the average cost of an attempt.
+
+Quality therefore affects economics even when the underlying model price does not change.
+
+## 22. Partial economics can still be decision-useful
+
+An incomplete cost model is not automatically useless.
+
+A precisely labelled metric such as:
+
+```text
+Known Direct Cost / Accepted Work
+Cost Completeness: Partial
+```
+
+can support optimization and comparison while additional cost evidence is being established.
+
+The problem is not incompleteness itself.
+
+The problem is presenting partial economics as complete economics.
+
+## 23. Cost completeness is separate from cost precision
+
+A measured number can be highly precise while still representing only part of the economic system.
+
+For example:
+
+```text
+Known direct execution cost = $0.075589
+```
+
+may be precisely measured while Search, observability, and human recovery remain unallocated.
+
+More decimal places do not make an incomplete denominator complete.
+
+## 24. Accepted Work is not Business Value
+
+Accepted Work proves that the AI system produced a qualifying output.
+
+It does not prove that the workflow advanced, a business outcome occurred, or economic value was created.
+
+```text
+Accepted Work
+→ Workflow Outcome
+→ Business Outcome
+→ Economic Value
+```
+
+Each transition requires its own evidence.
+
+## 25. Correlation is not incrementality
+
+A business event occurring after an AI interaction does not prove that the AI caused it.
+
+```text
+Order after AI
+≠
+Order caused by AI
+```
+
+Economic value should be based on outcomes that are incremental relative to a defensible counterfactual.
+
+## 26. Stronger value claims require stronger counterfactual evidence
+
+The more consequential the investment decision, the stronger the evidence needed to establish what would have happened without the AI capability.
+
+A modeled assumption may be sufficient for exploration.
+
+A scaling decision may require a pilot, control group, phased rollout, or another defensible comparison.
+
+## 27. Every arrow in the value chain is an evidence claim
+
+A value chain such as:
+
+```text
+AI Work
+→ Accepted Work
+→ Customer Action
+→ Business Outcome
+→ Economic Value
+```
+
+should not be treated as one assumption.
+
+Each arrow represents a separate claim that can have different evidence quality.
+
+## 28. A pilot should reduce decision uncertainty, not merely prove technical feasibility
+
+A technically successful pilot is insufficient if the important business-value assumptions remain unchanged.
+
+The pilot should be designed to collect evidence on the links most likely to change the investment decision.
+
+## 29. Unknown outcome and negative outcome are different states
+
+Missing downstream evidence does not mean the business outcome failed.
+
+```text
+order_completed = False
+```
+
+means evidence shows no order occurred.
+
+```text
+order_completed = Unknown
+```
+
+means the outcome was not observed.
+
+Conflating the two can materially distort business-value estimates.
+
+## 30. Technical evidence and business evidence have different clocks
+
+Execution telemetry is often available immediately.
+
+Business outcomes may occur seconds, hours, days, or weeks later and may live in another system.
+
+The evidence model must therefore support delayed joining by stable identity rather than assuming all evidence exists at execution time.
+
+## 31. Observed outcome and attributable outcome are separate claims
+
+An observed business event can be real while its incrementality remains unknown.
+
+```text
+Observed Order = True
+Incremental Order = Unknown
+```
+
+is a valid and often necessary evidence state.
+
+Do not force causal certainty merely because the downstream event is measurable.
+
+## 32. Do not use assumptions to fill missing observations
+
+A modeled conversion rate can support scenario analysis.
+
+It must not be used to fabricate observed customer outcomes.
+
+```text
+Assumption
+≠
+Observation
+```
+
+Keep scenario models and evidence records separate.

@@ -19,6 +19,9 @@ from foundry_prompt_agent.business_economics import (
     load_business_assumptions,
     summarize_business_economics,
 )
+from foundry_prompt_agent.business_outcomes import (
+    build_business_outcome_records,
+)
 from foundry_prompt_agent.execution import (
     apply_acceptance,
     attribute_costs,
@@ -41,6 +44,7 @@ from foundry_prompt_agent.tokenomics import (
 DATASET_PATH = Path("evals/contoso_agent_eval_v3.jsonl")
 RESULTS_PATH = Path("evals/results_v3.jsonl")
 EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
+BUSINESS_OUTCOME_RECORDS_PATH = Path("evals/business_outcome_records_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -150,6 +154,42 @@ def print_execution_economics(summary: dict) -> None:
 
     if summary["cost_completeness"] == "partial":
         print("Full Execution Cost: NOT YET ESTABLISHED")
+
+
+def persist_business_outcome_records(records: list[dict]) -> None:
+    with BUSINESS_OUTCOME_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        for record in records:
+            output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved business outcome records to {BUSINESS_OUTCOME_RECORDS_PATH}")
+
+
+def print_business_outcome_evidence(records: list[dict]) -> None:
+    print("\n=== Business Outcome Evidence ===")
+    print(f"Interactions: {len(records)}")
+
+    accepted_units = sum(1 for r in records if r["accepted"] is True)
+    print(f"Accepted work units: {accepted_units}")
+
+    with_evidence = sum(
+        1 for r in records if r["outcome_evidence_source"] is not None
+    )
+    print(f"Interactions with downstream outcome evidence: {with_evidence}")
+
+    observed_orders = sum(1 for r in records if r["order_completed"] is True)
+    if with_evidence == 0:
+        # 0 evidence records is not the same as 0 business outcomes.
+        print("Observed completed orders: unknown / 0 observed")
+    else:
+        print(f"Observed completed orders: {observed_orders} observed")
+
+    has_incrementality = any(
+        r["counterfactual_method"] is not None for r in records
+    )
+    print(
+        f"Incrementality evidence: "
+        f"{'available' if has_incrementality else 'unavailable'}"
+    )
 
 
 def print_efficiency(summary: dict) -> None:
@@ -347,6 +387,14 @@ def main() -> None:
             execution_records, attributions
         )
         print_execution_economics(execution_economics)
+
+        # 4e. Business Outcome Evidence: no downstream system yet, so all
+        # downstream fields correctly persist as Unknown (None).
+        business_outcome_records = build_business_outcome_records(
+            execution_records, outcome_events=None
+        )
+        persist_business_outcome_records(business_outcome_records)
+        print_business_outcome_evidence(business_outcome_records)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
