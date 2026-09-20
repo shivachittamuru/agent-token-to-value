@@ -181,6 +181,7 @@ def collect_accepted_work(
     openai_client,
     run,
     *,
+    attempted_interactions: int,
     behavior_criterion: str = BEHAVIOR_CRITERION,
     mandatory_guardrails: tuple[str, ...] = (SCOPE_CRITERION,),
 ) -> dict:
@@ -191,6 +192,11 @@ def collect_accepted_work(
     per interaction from Foundry's output items; aggregate pass-rate
     multiplication is intentionally avoided because it is not a valid
     Accepted Work metric.
+
+    The denominator is `attempted_interactions` (the actual workload size),
+    not the number of returned rows. If Foundry returns fewer evaluation
+    items than were attempted, the missing rows are surfaced and counted
+    conservatively as not accepted.
     """
 
     output_items = openai_client.evals.runs.output_items.list(
@@ -227,14 +233,20 @@ def collect_accepted_work(
             }
         )
 
-    attempted = len(rows)
-    rejected = attempted - accepted
+    evaluated = len(rows)
+    missing = attempted_interactions - evaluated
+    # Missing rows have no acceptance evidence, so they count as rejected.
+    rejected = attempted_interactions - accepted
 
     return {
-        "attempted_interactions": attempted,
+        "attempted_interactions": attempted_interactions,
+        "evaluated_interactions": evaluated,
+        "missing_interactions": missing,
         "accepted_interactions": accepted,
         "rejected_interactions": rejected,
-        "accepted_work_rate": accepted / attempted if attempted else 0.0,
+        "accepted_work_rate": (
+            accepted / attempted_interactions if attempted_interactions else 0.0
+        ),
         "rows": rows,
     }
 

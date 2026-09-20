@@ -60,34 +60,47 @@ def summarize_effectiveness(efficiency: dict, success_rate: float) -> dict:
     }
 
 
-def summarize_accepted_work(efficiency: dict, accepted_work_rate: float) -> dict:
-    """Derive Accepted Work token economics from measured efficiency.
+def summarize_accepted_work(
+    efficiency: dict,
+    *,
+    accepted_interactions: int,
+    attempted_interactions: int,
+) -> dict:
+    """Derive Accepted Work token economics from observed interaction counts.
 
     Accepted Work is a stricter signal than the behavior pass rate: an
     interaction only counts when it satisfies the behavior rubric and every
-    mandatory guardrail. The `accepted_work_rate` is decided per interaction
-    upstream; this function only converts it into token economics. Zero
-    accepted work yields infinite unit costs.
+    mandatory guardrail. Both counts are observed upstream from row-level
+    results; this function only converts them into token economics. The
+    denominator is the actual number of workload attempts, so interactions
+    with no acceptance evidence are treated conservatively (not accepted).
+    Zero accepted work yields infinite unit costs.
     """
 
-    accepted_work_units = accepted_work_rate * efficiency["tasks"]
+    accepted_work_rate = (
+        accepted_interactions / attempted_interactions
+        if attempted_interactions
+        else 0.0
+    )
 
-    if accepted_work_units <= 0:
+    if accepted_interactions <= 0:
         return {
+            "attempted_interactions": attempted_interactions,
+            "accepted_interactions": accepted_interactions,
             "accepted_work_rate": accepted_work_rate,
-            "accepted_work_units": 0.0,
             "tokens_per_accepted_work": float("inf"),
             "cost_per_accepted_work": float("inf"),
         }
 
     return {
+        "attempted_interactions": attempted_interactions,
+        "accepted_interactions": accepted_interactions,
         "accepted_work_rate": accepted_work_rate,
-        "accepted_work_units": accepted_work_units,
         "tokens_per_accepted_work": (
-            efficiency["tokens_per_task"] / accepted_work_rate
+            efficiency["total_tokens"] / accepted_interactions
         ),
         "cost_per_accepted_work": (
-            efficiency["cost_per_task"] / accepted_work_rate
+            efficiency["total_cost"] / accepted_interactions
         ),
     }
 

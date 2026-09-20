@@ -104,10 +104,10 @@ def print_effectiveness(summary: dict) -> None:
 def print_accepted_work(acceptance: dict, economics: dict) -> None:
     print("\n=== Accepted Work ===")
     print(f"Attempted interactions: {acceptance['attempted_interactions']}")
+    print(f"Evaluated interactions: {acceptance['evaluated_interactions']}")
     print(f"Accepted interactions: {acceptance['accepted_interactions']}")
     print(f"Rejected interactions: {acceptance['rejected_interactions']}")
     print(f"Accepted work rate: {acceptance['accepted_work_rate']:.1%}")
-    print(f"Accepted work units: {economics['accepted_work_units']:.1f}")
     print(
         f"Tokens per accepted work: "
         f"{economics['tokens_per_accepted_work']:,.1f}"
@@ -116,6 +116,24 @@ def print_accepted_work(acceptance: dict, economics: dict) -> None:
         f"Cost per accepted work: "
         f"${economics['cost_per_accepted_work']:.6f}"
     )
+
+    missing = acceptance["missing_interactions"]
+    if missing > 0:
+        print(
+            f"WARNING: {missing} attempted interaction(s) returned no "
+            f"row-level evaluation evidence; counted as rejected."
+        )
+
+    rejected_rows = [row for row in acceptance["rows"] if not row["accepted"]]
+    if rejected_rows:
+        print("Rejected interactions:")
+        for row in rejected_rows:
+            behavior = "pass" if row["behavior_passed"] else "fail"
+            guardrails = "pass" if row["guardrails_passed"] else "fail"
+            print(
+                f"  - {row['name']}: "
+                f"behavior={behavior} guardrails={guardrails}"
+            )
 
 
 def print_business_economics(summary: dict) -> None:
@@ -234,9 +252,13 @@ def main() -> None:
 
         # 4b. Accepted Work: per-interaction acceptance from row-level results.
         openai_client = project_client.get_openai_client()
-        acceptance = collect_accepted_work(openai_client, run)
+        acceptance = collect_accepted_work(
+            openai_client, run, attempted_interactions=efficiency["tasks"]
+        )
         accepted_work = summarize_accepted_work(
-            efficiency, acceptance["accepted_work_rate"]
+            efficiency,
+            accepted_interactions=acceptance["accepted_interactions"],
+            attempted_interactions=acceptance["attempted_interactions"],
         )
         print_accepted_work(acceptance, accepted_work)
 
