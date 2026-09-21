@@ -22,7 +22,11 @@ from foundry_prompt_agent.business_economics import (
 from foundry_prompt_agent.business_outcomes import (
     build_business_outcome_records,
 )
+from foundry_prompt_agent.economic_value import (
+    build_economic_value_record,
+)
 from foundry_prompt_agent.execution import (
+    WORKLOAD_ID,
     apply_acceptance,
     attribute_costs,
     build_execution_records,
@@ -49,6 +53,7 @@ RESULTS_PATH = Path("evals/results_v3.jsonl")
 EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
 BUSINESS_OUTCOME_RECORDS_PATH = Path("evals/business_outcome_records_v1.jsonl")
 PILOT_EVIDENCE_RECORDS_PATH = Path("evals/pilot_evidence_records_v1.jsonl")
+ECONOMIC_VALUE_RECORDS_PATH = Path("evals/economic_value_records_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -222,6 +227,61 @@ def print_pilot_evidence(records: list[dict]) -> None:
     print(f"Treatment assignments: {treatment}")
     print(f"Control assignments: {control}")
     print("Pilot evidence: available")
+
+
+def persist_economic_value_record(record: dict) -> None:
+    with ECONOMIC_VALUE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved economic value record to {ECONOMIC_VALUE_RECORDS_PATH}")
+
+
+def print_economic_value(record: dict) -> None:
+    print("\n=== Economic Value ===")
+    print(
+        f"Value evidence: "
+        f"{record['value_evidence_status'].replace('_', ' ').upper()}"
+    )
+    print(
+        f"Modeled recovered contribution/month: "
+        f"${record['modeled_recovered_contribution_usd']:,.2f}"
+    )
+    print(
+        f"Modeled AI Value Multiple: "
+        f"{record['modeled_ai_value_multiple']:,.1f}x"
+    )
+
+    incremental_orders = record["incremental_orders"]
+    print(
+        "Incremental orders: "
+        + (
+            str(incremental_orders)
+            if incremental_orders is not None
+            else "NOT ESTABLISHED"
+        )
+    )
+
+    incremental_contribution = record["incremental_contribution_usd"]
+    print(
+        "Incremental contribution: "
+        + (
+            f"${incremental_contribution:,.2f}"
+            if incremental_contribution is not None
+            else "NOT ESTABLISHED"
+        )
+    )
+
+    print(f"Cost completeness: {record['cost_completeness'].upper()}")
+
+    net_value = record["customer_net_economic_value_usd"]
+    print(
+        "Customer Net Economic Value: "
+        + (
+            f"${net_value:,.2f}"
+            if net_value is not None
+            else "NOT ESTABLISHED"
+        )
+    )
 
 
 def print_efficiency(summary: dict) -> None:
@@ -452,6 +512,19 @@ def main() -> None:
         )
 
         print_business_economics(business_economics)
+
+        # 6b. Economic Value: modeled today; incremental value and Customer
+        # Net Economic Value stay Unknown until counterfactual evidence and
+        # complete cost exist.
+        economic_value_record = build_economic_value_record(
+            run_id=run_id,
+            workload_id=WORKLOAD_ID,
+            modeled_business_economics=business_economics,
+            execution_economics=execution_economics,
+            incremental_evidence=None,
+        )
+        persist_economic_value_record(economic_value_record)
+        print_economic_value(economic_value_record)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(
