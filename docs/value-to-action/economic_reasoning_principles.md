@@ -608,3 +608,49 @@ Failed Mandatory Control
 ≠
 Approval
 ```
+
+## 56. Select the action from the deficit, not from the headline metric
+
+The correct action depends on what currently prevents the workload from reaching the next justified economic state.
+
+```text
+Evidence deficit   → PROVE
+Execution deficit  → OPTIMIZE
+Structural deficit → RESTRUCTURE
+```
+
+A high value estimate does not identify which intervention is needed.
+
+## 57. PROVE must buy information
+
+PROVE is justified when additional evidence can materially change the decision.
+
+Its purpose is not continued experimentation for its own sake.
+
+A PROVE investment should specify:
+
+```text
+which uncertainty
++
+what evidence
++
+what decision it will unlock
+```
+
+## 58. Eligibility constrains selection
+
+A selected portfolio action must be among the actions allowed by the Decision Gates.
+
+```text
+Eligible Action Set
+        ↓
+Action Selection
+```
+
+Selection cannot override a gate merely because another action appears attractive.
+
+## 59. Every portfolio action needs a reassessment trigger
+
+An action without a reassessment condition can become permanent by inertia.
+
+Every action should define what new evidence, event, or condition causes the workload to be reviewed again.

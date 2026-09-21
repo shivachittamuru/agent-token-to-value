@@ -47,6 +47,9 @@ from foundry_prompt_agent.workload_assessment import (
 from foundry_prompt_agent.pilot_evidence import (
     build_pilot_evidence_records,
 )
+from foundry_prompt_agent.portfolio_action import (
+    build_portfolio_action_record,
+)
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -74,6 +77,9 @@ VALUE_RESILIENCE_RECORDS_PATH = Path(
 )
 WORKLOAD_ASSESSMENT_PATH = Path("evals/workload_assessment_v1.jsonl")
 DECISION_GATE_RECORDS_PATH = Path("evals/decision_gate_records_v1.jsonl")
+PORTFOLIO_ACTION_RECORDS_PATH = Path(
+    "evals/portfolio_action_records_v1.jsonl"
+)
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -444,6 +450,30 @@ def print_decision_gates(record: dict) -> None:
     print("Final portfolio action: NOT SELECTED")
 
 
+def persist_portfolio_action_record(record: dict) -> None:
+    with PORTFOLIO_ACTION_RECORDS_PATH.open(
+        "w", encoding="utf-8"
+    ) as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved portfolio action record to {PORTFOLIO_ACTION_RECORDS_PATH}")
+
+
+def print_portfolio_action(record: dict) -> None:
+    print("\n=== Portfolio Action ===")
+    print(f"Decision context: {record['decision_context']}")
+    print(
+        f"Primary decision deficit: "
+        f"{record['primary_decision_deficit'].replace('_', ' ').upper()}"
+    )
+    print(f"Selected action: {record['selected_action'].upper()}")
+    print(f"Rationale: {record['action_rationale']}")
+    print("Authorized next work: bounded evidence-producing pilot")
+    owner = record["decision_owner"] or "UNKNOWN"
+    print(f"Decision owner: {owner}")
+    print(f"Reassessment trigger: {record['reassessment_trigger']}")
+
+
 def print_efficiency(summary: dict) -> None:
     print("\n=== Token Efficiency ===")
     print(f"Tasks: {summary['tasks']}")
@@ -760,6 +790,23 @@ def main() -> None:
         )
         persist_decision_gate_record(decision_gate_record)
         print_decision_gates(decision_gate_record)
+
+        # 7b. Portfolio Action: select the action addressing the primary
+        # decision deficit, constrained by gate eligibility.
+        portfolio_action_record = build_portfolio_action_record(
+            workload_id=WORKLOAD_ID,
+            decision_id=None,
+            decision_context=(
+                "Determine what portfolio action is justified by the "
+                "current evidence."
+            ),
+            workload_assessment=workload_assessment,
+            decision_gates=decision_gate_record,
+            decision_owner=None,
+            decision_date=datetime.now(timezone.utc).isoformat(),
+        )
+        persist_portfolio_action_record(portfolio_action_record)
+        print_portfolio_action(portfolio_action_record)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(
