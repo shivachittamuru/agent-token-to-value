@@ -35,6 +35,9 @@ from foundry_prompt_agent.execution import (
 from foundry_prompt_agent.incremental_economics import (
     build_incremental_economics_record,
 )
+from foundry_prompt_agent.value_resilience import (
+    build_value_resilience_record,
+)
 from foundry_prompt_agent.pilot_evidence import (
     build_pilot_evidence_records,
 )
@@ -59,6 +62,9 @@ PILOT_EVIDENCE_RECORDS_PATH = Path("evals/pilot_evidence_records_v1.jsonl")
 ECONOMIC_VALUE_RECORDS_PATH = Path("evals/economic_value_records_v1.jsonl")
 INCREMENTAL_ECONOMICS_RECORDS_PATH = Path(
     "evals/incremental_economics_records_v1.jsonl"
+)
+VALUE_RESILIENCE_RECORDS_PATH = Path(
+    "evals/value_resilience_records_v1.jsonl"
 )
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
@@ -334,6 +340,36 @@ def print_incremental_economics(record: dict) -> None:
     )
 
 
+def persist_value_resilience_record(record: dict) -> None:
+    with VALUE_RESILIENCE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved value resilience record to {VALUE_RESILIENCE_RECORDS_PATH}")
+
+
+def print_value_resilience(record: dict) -> None:
+    print("\n=== Value Resilience ===")
+    print(f"Scope: {record['resilience_scope'].replace('_', ' ').upper()}")
+
+    base = record["base_case"]
+    print(
+        f"Base modeled AI Value Multiple: "
+        f"{base['modeled_ai_value_multiple']:,.1f}x"
+    )
+    print(
+        f"Break-even conversion rate: "
+        f"{base['break_even_conversion_rate']:.2%}"
+    )
+    print(f"Stress scenarios evaluated: {len(record['stress_scenarios'])}")
+    print(
+        f"Resilience classification: "
+        f"{record['resilience_status'].replace('_', ' ').upper()}"
+    )
+    print(f"Structural Unknowns: {len(record['structural_unknowns'])}")
+    for unknown in record["structural_unknowns"]:
+        print(f"  - {unknown}")
+
+
 def print_efficiency(summary: dict) -> None:
     print("\n=== Token Efficiency ===")
     print(f"Tasks: {summary['tasks']}")
@@ -585,6 +621,38 @@ def main() -> None:
         )
         persist_incremental_economics_record(incremental_economics_record)
         print_incremental_economics(incremental_economics_record)
+
+        # 6d. Value Resilience: modeled scenario sensitivity only. Transparent
+        # adverse stress on important modeled drivers; no probabilities.
+        conversion_rate = assumptions["conversion_rate"]
+        stress_spec = {
+            "conversion_rate": [conversion_rate * 0.5, conversion_rate * 0.25],
+            "average_order_value_usd": [
+                assumptions["average_order_value_usd"] * 0.8
+            ],
+            "contribution_margin": [
+                assumptions["contribution_margin"] * 0.8
+            ],
+            "cost_stress_multiplier": [5.0, 10.0],
+            "combined": [
+                {
+                    "name": "downturn",
+                    "conversion_rate": conversion_rate * 0.5,
+                    "cost_stress_multiplier": 5.0,
+                }
+            ],
+        }
+        value_resilience_record = build_value_resilience_record(
+            workload_id=WORKLOAD_ID,
+            measured_run={
+                "success_rate": success_rate,
+                "cost_per_task": efficiency["cost_per_task"],
+            },
+            assumptions=assumptions,
+            stress_spec=stress_spec,
+        )
+        persist_value_resilience_record(value_resilience_record)
+        print_value_resilience(value_resilience_record)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(

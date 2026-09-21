@@ -501,3 +501,43 @@ Marginal Cost
 ```
 
 Scale decisions should model the actual cost behavior of the proposed increment.
+
+## 45. Evidence confidence and value resilience are different
+
+Evidence Confidence asks how strongly the current economic claim is supported.
+
+Value Resilience asks how much important conditions can deteriorate before the economic conclusion changes.
+
+A result can be well evidenced but fragile, or weakly evidenced but apparently resilient in scenario analysis.
+
+## 46. Sensitivity analysis tests conclusions, not assumptions
+
+Changing an assumption across scenarios reveals how economics respond to that assumption.
+
+It does not establish which assumption is true.
+
+```text
+Sensitivity
+≠
+Evidence
+```
+
+## 47. Break-even boundaries can be more useful than base-case estimates
+
+A base case tells us what economics look like under one set of inputs.
+
+A break-even boundary tells us how far an important driver can deteriorate before the economic conclusion changes.
+
+That margin can be more useful for decision-making than the headline value estimate.
+
+## 48. High uncertainty plus high sensitivity is an evidence priority
+
+The most decision-relevant evidence gaps are often variables that are both:
+
+```text
+highly uncertain
++
+economically sensitive
+```
+
+Those variables should receive priority in pilots, instrumentation, and follow-up analysis.
