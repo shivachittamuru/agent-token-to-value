@@ -567,3 +567,44 @@ The assessment layer should consume established technical, economic, resilience,
 It should not independently recreate their calculations.
 
 This preserves traceability and keeps one source of truth for each claim.
+
+## 52. Decision gates are not scores
+
+Decision gates constrain which actions are supportable.
+
+They should not be averaged into a universal workload score.
+
+## 53. Evidence sufficiency depends on decision consequence
+
+Evidence that is sufficient to justify exploration may be insufficient to justify large-scale investment.
+
+```text
+Evidence
++
+Decision Context
+=
+Gate Readiness
+```
+
+## 54. Unknown is not failure
+
+A missing assessment should remain Unknown.
+
+```text
+UNKNOWN ≠ FAIL
+UNKNOWN ≠ PASS
+```
+
+The correct response to Unknown is to determine whether the evidence is required for the decision and, if so, how to obtain it.
+
+## 55. Some gates are non-compensable
+
+Mandatory safety, security, regulatory, Responsible AI, or governance requirements cannot be numerically offset by strong economics.
+
+```text
+High Value
++
+Failed Mandatory Control
+≠
+Approval
+```

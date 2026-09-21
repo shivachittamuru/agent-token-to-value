@@ -22,6 +22,9 @@ from foundry_prompt_agent.business_economics import (
 from foundry_prompt_agent.business_outcomes import (
     build_business_outcome_records,
 )
+from foundry_prompt_agent.decision_gates import (
+    build_decision_gate_record,
+)
 from foundry_prompt_agent.economic_value import (
     build_economic_value_record,
 )
@@ -70,6 +73,7 @@ VALUE_RESILIENCE_RECORDS_PATH = Path(
     "evals/value_resilience_records_v1.jsonl"
 )
 WORKLOAD_ASSESSMENT_PATH = Path("evals/workload_assessment_v1.jsonl")
+DECISION_GATE_RECORDS_PATH = Path("evals/decision_gate_records_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -410,6 +414,36 @@ def print_workload_assessment(record: dict) -> None:
     )
 
 
+def persist_decision_gate_record(record: dict) -> None:
+    with DECISION_GATE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved decision gate record to {DECISION_GATE_RECORDS_PATH}")
+
+
+def print_decision_gates(record: dict) -> None:
+    gates = record["gates"]
+
+    def status(name: str) -> str:
+        return gates[name]["status"].replace("_", " ").upper()
+
+    print("\n=== Decision Gates ===")
+    print(f"Decision context: {record['decision_context']}")
+    print(f"Strategic / mandatory: {status('strategic_mandatory_gate')}")
+    print(f"Value: {status('value_gate')}")
+    print(f"Evidence: {status('evidence_gate')}")
+    print(f"Value resilience: {status('resilience_gate')}")
+    print(f"Incremental economics: {status('incremental_economics_gate')}")
+    print(f"Commercial fit: {status('commercial_fit_gate')}")
+    print(f"RAI / risk / control: {status('rai_risk_control_gate')}")
+    print()
+    print(f"Blocking gates: {len(record['blocking_gates'])}")
+    print(f"Unknown gates: {len(record['unknown_gates'])}")
+    scale_eligible = "YES" if "scale" in record["eligible_actions"] else "NO"
+    print(f"Scale eligible: {scale_eligible}")
+    print("Final portfolio action: NOT SELECTED")
+
+
 def print_efficiency(summary: dict) -> None:
     print("\n=== Token Efficiency ===")
     print(f"Tasks: {summary['tasks']}")
@@ -707,6 +741,25 @@ def main() -> None:
         )
         persist_workload_assessment(workload_assessment)
         print_workload_assessment(workload_assessment)
+
+        # 7a. Decision Gates: independent DECIDE-phase constraints and action
+        # eligibility. No composite score and no final action selection.
+        decision_gate_record = build_decision_gate_record(
+            workload_id=WORKLOAD_ID,
+            decision_id=None,
+            decision_context=(
+                "Determine what portfolio actions are supportable by the "
+                "current evidence."
+            ),
+            workload_assessment=workload_assessment,
+            incremental_economics=incremental_economics_record,
+            value_resilience=value_resilience_record,
+            commercial_fit=None,
+            governance=None,
+            strategic_context=None,
+        )
+        persist_decision_gate_record(decision_gate_record)
+        print_decision_gates(decision_gate_record)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(
