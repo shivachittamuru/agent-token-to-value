@@ -1,5 +1,5 @@
-# AI Profitability Loop
-## From Tokens → Useful Work → Business Value → Action
+# AI Value Loop
+## From Tokens → Verified Outcomes → Business Value → Action
 
 ### Purpose
 Create a common language for AI profitability that works across technical, business, and partner teams.
