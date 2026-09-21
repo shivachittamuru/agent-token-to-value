@@ -79,12 +79,23 @@ def test_partial_cost_keeps_customer_nev_none():
     assert record["customer_net_economic_value_usd"] is None
 
 
-def test_incremental_with_incomplete_cost_still_no_nev():
+def test_complete_execution_cost_alone_does_not_produce_nev():
+    # Execution-cost completeness must not stand in for customer-cost completeness.
     record = build(
-        execution_economics=execution_economics(cost_completeness="partial"),
+        execution_economics=execution_economics(cost_completeness="complete"),
+        incremental_evidence={"incremental_contribution_usd": 17.5},
+    )
+
+    assert record["customer_net_economic_value_usd"] is None
+
+
+def test_incremental_with_complete_execution_cost_but_no_customer_cost():
+    record = build(
+        execution_economics=execution_economics(cost_completeness="complete"),
         incremental_evidence={
             "incremental_orders": 5,
             "incremental_contribution_usd": 17.5,
+            "value_economic_basis_id": "pilot-2026Q4",
         },
     )
 
@@ -95,19 +106,52 @@ def test_incremental_with_incomplete_cost_still_no_nev():
     assert record["customer_net_economic_value_usd"] is None
 
 
-def test_complete_incremental_and_cost_produces_nev():
+def test_incremental_with_incomplete_customer_cost_still_no_nev():
     record = build(
-        execution_economics=execution_economics(
-            cost_completeness="complete", known_direct=0.08
-        ),
+        execution_economics=execution_economics(cost_completeness="complete"),
+        incremental_evidence={
+            "incremental_contribution_usd": 17.5,
+            "value_economic_basis_id": "pilot-2026Q4",
+            "total_relevant_customer_cost_usd": 4.0,
+            "customer_cost_completeness": "partial",
+            "cost_economic_basis_id": "pilot-2026Q4",
+        },
+    )
+
+    assert record["customer_net_economic_value_usd"] is None
+
+
+def test_complete_customer_cost_and_matching_basis_produces_nev():
+    record = build(
+        execution_economics=execution_economics(cost_completeness="partial"),
         incremental_evidence={
             "incremental_orders": 5,
             "incremental_revenue_usd": 50.0,
             "incremental_contribution_usd": 17.5,
+            "value_economic_basis_id": "pilot-2026Q4",
+            "total_relevant_customer_cost_usd": 4.0,
+            "customer_cost_completeness": "complete",
+            "cost_economic_basis_id": "pilot-2026Q4",
         },
     )
 
-    assert record["customer_net_economic_value_usd"] == pytest.approx(17.42)
+    # NEV uses the Total Relevant Customer Cost, never execution cost.
+    assert record["customer_net_economic_value_usd"] == pytest.approx(13.5)
+
+
+def test_mismatched_economic_basis_keeps_nev_none():
+    record = build(
+        execution_economics=execution_economics(cost_completeness="complete"),
+        incremental_evidence={
+            "incremental_contribution_usd": 17.5,
+            "value_economic_basis_id": "pilot-2026Q4",
+            "total_relevant_customer_cost_usd": 4.0,
+            "customer_cost_completeness": "complete",
+            "cost_economic_basis_id": "pilot-2027Q1",
+        },
+    )
+
+    assert record["customer_net_economic_value_usd"] is None
 
 
 def test_value_status_is_separate_from_cost_completeness():
@@ -121,12 +165,19 @@ def test_value_status_is_separate_from_cost_completeness():
         == VALUE_EVIDENCE_INCREMENTAL_ESTABLISHED
     )
     assert record["cost_completeness"] == "partial"
+    assert record["customer_cost_completeness"] is None
 
 
 def test_zero_incremental_value_is_preserved_not_unknown():
     record = build(
-        execution_economics=execution_economics(cost_completeness="complete"),
-        incremental_evidence={"incremental_contribution_usd": 0.0},
+        execution_economics=execution_economics(cost_completeness="partial"),
+        incremental_evidence={
+            "incremental_contribution_usd": 0.0,
+            "value_economic_basis_id": "pilot-2026Q4",
+            "total_relevant_customer_cost_usd": 4.0,
+            "customer_cost_completeness": "complete",
+            "cost_economic_basis_id": "pilot-2026Q4",
+        },
     )
 
     assert record["incremental_contribution_usd"] == 0.0
@@ -134,5 +185,5 @@ def test_zero_incremental_value_is_preserved_not_unknown():
         record["value_evidence_status"]
         == VALUE_EVIDENCE_INCREMENTAL_ESTABLISHED
     )
-    # NEV = 0 incremental value - known direct cost.
-    assert record["customer_net_economic_value_usd"] == pytest.approx(-0.08)
+    # NEV = 0 incremental value - Total Relevant Customer Cost.
+    assert record["customer_net_economic_value_usd"] == pytest.approx(-4.0)

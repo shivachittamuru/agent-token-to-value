@@ -422,3 +422,82 @@ Do not retain an assumption simply because it produces a cleaner value story whe
 Eligibility, assignment, attribution windows, exclusions, and primary outcomes should be defined before examining pilot results.
 
 Changing the measurement rules after seeing outcomes weakens the credibility of the evidence.
+
+## 39. Value and cost must share the same economic basis
+
+Economic value and economic cost cannot be combined merely because both are measured in dollars.
+
+They must refer to a compatible:
+
+```text
+population
++
+time period
++
+workload scope
+```
+
+For example:
+
+```text
+monthly value
+-
+single-test-run cost
+```
+
+does not produce meaningful Net Economic Value.
+
+## 40. Execution cost completeness is not customer-cost completeness
+
+A complete account of runtime execution cost does not automatically include every cost relevant to the customer's economic decision.
+
+```text
+Full Execution Cost
+≠
+Total Relevant Customer Cost
+```
+
+Customer Net Economic Value requires the cost boundary appropriate to the decision being made.
+
+## 41. Historical economics do not answer the next-dollar question
+
+A workload can have strong historical economics while the next increment of scale has poor economics.
+
+Investment decisions should evaluate the additional value and additional cost caused by the proposed change.
+
+## 42. Define the increment before calculating incremental economics
+
+"Scale the workload" is not an economic unit.
+
+The proposed change must be explicit, such as:
+
+```text
+additional 1,000 interactions/month
+new geography
+new workflow
+higher service level
+```
+
+Only then can incremental value and incremental cost be meaningfully compared.
+
+## 43. Sunk cost and incremental cost answer different questions
+
+A cost already incurred may matter to total historical economics without affecting the economics of the next investment.
+
+```text
+Would this cost change if we make the proposed investment?
+```
+
+is the key incremental-cost question.
+
+## 44. Marginal economics can be nonlinear
+
+Fixed capacity, shared infrastructure, and step-function resource requirements can make the cost of the next unit very different from historical average cost.
+
+```text
+Average Cost
+≠
+Marginal Cost
+```
+
+Scale decisions should model the actual cost behavior of the proposed increment.

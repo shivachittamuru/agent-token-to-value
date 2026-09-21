@@ -32,6 +32,9 @@ from foundry_prompt_agent.execution import (
     build_execution_records,
     summarize_execution_economics,
 )
+from foundry_prompt_agent.incremental_economics import (
+    build_incremental_economics_record,
+)
 from foundry_prompt_agent.pilot_evidence import (
     build_pilot_evidence_records,
 )
@@ -54,6 +57,9 @@ EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
 BUSINESS_OUTCOME_RECORDS_PATH = Path("evals/business_outcome_records_v1.jsonl")
 PILOT_EVIDENCE_RECORDS_PATH = Path("evals/pilot_evidence_records_v1.jsonl")
 ECONOMIC_VALUE_RECORDS_PATH = Path("evals/economic_value_records_v1.jsonl")
+INCREMENTAL_ECONOMICS_RECORDS_PATH = Path(
+    "evals/incremental_economics_records_v1.jsonl"
+)
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -279,6 +285,50 @@ def print_economic_value(record: dict) -> None:
         + (
             f"${net_value:,.2f}"
             if net_value is not None
+            else "NOT ESTABLISHED"
+        )
+    )
+
+
+def persist_incremental_economics_record(record: dict) -> None:
+    with INCREMENTAL_ECONOMICS_RECORDS_PATH.open(
+        "w", encoding="utf-8"
+    ) as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(
+        f"Saved incremental economics record to "
+        f"{INCREMENTAL_ECONOMICS_RECORDS_PATH}"
+    )
+
+
+def print_incremental_economics(record: dict) -> None:
+    print("\n=== Incremental Economics ===")
+
+    increment = record["increment_description"]
+    print("Proposed increment: " + (increment or "NOT DEFINED"))
+
+    basis = record["economic_basis_id"]
+    print("Economic basis: " + (basis or "NOT ESTABLISHED"))
+
+    value = record["incremental_value_usd"]
+    print(
+        "Incremental value: "
+        + (f"${value:,.2f}" if value is not None else "NOT ESTABLISHED")
+    )
+
+    cost = record["incremental_customer_cost_usd"]
+    print(
+        "Incremental customer cost: "
+        + (f"${cost:,.2f}" if cost is not None else "NOT ESTABLISHED")
+    )
+
+    delta_nev = record["incremental_net_economic_value_usd"]
+    print(
+        "Incremental Net Economic Value: "
+        + (
+            f"${delta_nev:,.2f}"
+            if delta_nev is not None
             else "NOT ESTABLISHED"
         )
     )
@@ -525,6 +575,16 @@ def main() -> None:
         )
         persist_economic_value_record(economic_value_record)
         print_economic_value(economic_value_record)
+
+        # 6c. Incremental (next-dollar) economics: no proposed increment is
+        # defined for this run, so incremental value/cost stay Unknown.
+        incremental_economics_record = build_incremental_economics_record(
+            workload_id=WORKLOAD_ID,
+            decision_id=None,
+            increment=None,
+        )
+        persist_incremental_economics_record(incremental_economics_record)
+        print_incremental_economics(incremental_economics_record)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(

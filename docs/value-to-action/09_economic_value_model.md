@@ -200,13 +200,15 @@ INCREMENTAL
 
 A defensible counterfactual supports attribution to the workload.
 
-```text
-PARTIAL_COST
-```
+Value evidence status and cost completeness are **separate dimensions** and must never be collapsed into a single state. Cost completeness is tracked on its own fields, so a state such as `PARTIAL_COST` must not appear as a value-evidence status.
 
-Economic value may be known, but relevant cost attribution remains incomplete.
+The value-evidence states describe only how value is justified:
 
-These states should not be silently collapsed into one number.
+- `modeled_only`
+- `observed_not_incremental`
+- `incremental_value_established`
+
+Cost completeness is recorded independently, and execution-cost completeness is distinct from customer-cost completeness. A complete execution cost does not imply a complete Total Relevant Customer Cost. These dimensions should not be silently collapsed into one number.
 
 ## Value Numerator
 
