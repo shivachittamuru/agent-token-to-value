@@ -352,3 +352,73 @@ Observation
 ```
 
 Keep scenario models and evidence records separate.
+
+## 33. Business evidence should carry provenance
+
+A downstream value claim should identify where the supporting evidence came from.
+
+```text
+Outcome
++
+Evidence Source
++
+Observation Time
+=
+Traceable Business Evidence
+```
+
+An outcome field without provenance may be useful as raw data, but it should not silently become trusted evidence for an investment decision.
+
+Stable identity tells us what the evidence belongs to.
+
+Provenance tells us why we should believe it.
+
+## 34. Define treatment before observing success
+
+Causal analysis should compare groups based on assignment made before the outcome is known.
+
+Do not define the AI treatment group as only the interactions that later became Accepted Work.
+
+That selects on a post-treatment result and can overstate value.
+
+## 35. Failed treatment work stays in the causal denominator
+
+When evaluating whether deploying AI improves business outcomes, failed AI attempts remain part of the treatment experience.
+
+```text
+Treatment Conversion
+=
+Treatment Outcomes
+──────────────────
+All Eligible Treatment Assignments
+```
+
+Removing failed treatment interactions measures the performance of successful AI work, not the effect of deploying the AI workload.
+
+## 36. Accepted Work explains treatment performance; it does not replace the counterfactual
+
+Accepted Work is valuable for diagnosing why a treatment performs well or poorly.
+
+The counterfactual is still required to determine whether the treatment created incremental business value.
+
+## 37. Replace assumptions with observations progressively
+
+Scenario assumptions are useful before real evidence exists.
+
+As pilot evidence becomes available:
+
+```text
+Assumption
+    ↓
+Observed Evidence
+    ↓
+More credible economics
+```
+
+Do not retain an assumption simply because it produces a cleaner value story when better evidence is available.
+
+## 38. Predefine the measurement rules
+
+Eligibility, assignment, attribution windows, exclusions, and primary outcomes should be defined before examining pilot results.
+
+Changing the measurement rules after seeing outcomes weakens the credibility of the evidence.

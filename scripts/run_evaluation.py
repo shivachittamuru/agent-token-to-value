@@ -28,6 +28,9 @@ from foundry_prompt_agent.execution import (
     build_execution_records,
     summarize_execution_economics,
 )
+from foundry_prompt_agent.pilot_evidence import (
+    build_pilot_evidence_records,
+)
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -45,6 +48,7 @@ DATASET_PATH = Path("evals/contoso_agent_eval_v3.jsonl")
 RESULTS_PATH = Path("evals/results_v3.jsonl")
 EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
 BUSINESS_OUTCOME_RECORDS_PATH = Path("evals/business_outcome_records_v1.jsonl")
+PILOT_EVIDENCE_RECORDS_PATH = Path("evals/pilot_evidence_records_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -190,6 +194,34 @@ def print_business_outcome_evidence(records: list[dict]) -> None:
         f"Incrementality evidence: "
         f"{'available' if has_incrementality else 'unavailable'}"
     )
+
+
+def persist_pilot_evidence_records(records: list[dict]) -> None:
+    with PILOT_EVIDENCE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
+        for record in records:
+            output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved pilot evidence records to {PILOT_EVIDENCE_RECORDS_PATH}")
+
+
+def print_pilot_evidence(records: list[dict]) -> None:
+    print("\n=== Pilot Evidence ===")
+    print(f"Interactions: {len(records)}")
+
+    assigned = sum(1 for r in records if r["assignment"] is not None)
+    print(f"Pilot-assigned interactions: {assigned}")
+
+    if assigned == 0:
+        print("Treatment assignments: unavailable")
+        print("Control assignments: unavailable")
+        print("Pilot evidence: unavailable")
+        return
+
+    treatment = sum(1 for r in records if r["assignment"] == "treatment")
+    control = sum(1 for r in records if r["assignment"] == "control")
+    print(f"Treatment assignments: {treatment}")
+    print(f"Control assignments: {control}")
+    print("Pilot evidence: available")
 
 
 def print_efficiency(summary: dict) -> None:
@@ -395,6 +427,14 @@ def main() -> None:
         )
         persist_business_outcome_records(business_outcome_records)
         print_business_outcome_evidence(business_outcome_records)
+
+        # 4f. Pilot Evidence: no pilot is running, so pilot metadata stays
+        # Unknown (None). Nothing is assigned, simulated, or randomized.
+        pilot_evidence_records = build_pilot_evidence_records(
+            execution_records, pilot_events=None
+        )
+        persist_pilot_evidence_records(pilot_evidence_records)
+        print_pilot_evidence(pilot_evidence_records)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
