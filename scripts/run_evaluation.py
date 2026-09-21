@@ -50,6 +50,11 @@ from foundry_prompt_agent.pilot_evidence import (
 from foundry_prompt_agent.portfolio_action import (
     build_portfolio_action_record,
 )
+from foundry_prompt_agent.run_artifacts import (
+    build_interaction_records,
+    build_run_summary,
+    persist_run_package,
+)
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -65,21 +70,6 @@ from foundry_prompt_agent.tokenomics import (
 
 DATASET_PATH = Path("evals/contoso_agent_eval_v3.jsonl")
 RESULTS_PATH = Path("evals/results_v3.jsonl")
-EXECUTION_RECORDS_PATH = Path("evals/execution_records_v1.jsonl")
-BUSINESS_OUTCOME_RECORDS_PATH = Path("evals/business_outcome_records_v1.jsonl")
-PILOT_EVIDENCE_RECORDS_PATH = Path("evals/pilot_evidence_records_v1.jsonl")
-ECONOMIC_VALUE_RECORDS_PATH = Path("evals/economic_value_records_v1.jsonl")
-INCREMENTAL_ECONOMICS_RECORDS_PATH = Path(
-    "evals/incremental_economics_records_v1.jsonl"
-)
-VALUE_RESILIENCE_RECORDS_PATH = Path(
-    "evals/value_resilience_records_v1.jsonl"
-)
-WORKLOAD_ASSESSMENT_PATH = Path("evals/workload_assessment_v1.jsonl")
-DECISION_GATE_RECORDS_PATH = Path("evals/decision_gate_records_v1.jsonl")
-PORTFOLIO_ACTION_RECORDS_PATH = Path(
-    "evals/portfolio_action_records_v1.jsonl"
-)
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -102,7 +92,7 @@ def load_dataset(path: Path) -> list[dict]:
         ]
 
 
-def generate_results(run_id: str) -> tuple[dict, list[dict]]:
+def generate_results(run_id: str) -> tuple[dict, list[dict], list[dict]]:
     cases = load_dataset(DATASET_PATH)
     usages = []
     entries = []
@@ -130,15 +120,7 @@ def generate_results(run_id: str) -> tuple[dict, list[dict]]:
 
     # Execution Records start with acceptance unknown; joined post-evaluation.
     execution_records = build_execution_records(run_id, entries)
-    return efficiency, execution_records
-
-
-def persist_execution_records(records: list[dict]) -> None:
-    with EXECUTION_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        for record in records:
-            output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved execution records to {EXECUTION_RECORDS_PATH}")
+    return efficiency, execution_records, cases
 
 
 def print_execution_evidence(records: list[dict]) -> None:
@@ -191,14 +173,6 @@ def print_execution_economics(summary: dict) -> None:
         print("Full Execution Cost: NOT YET ESTABLISHED")
 
 
-def persist_business_outcome_records(records: list[dict]) -> None:
-    with BUSINESS_OUTCOME_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        for record in records:
-            output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved business outcome records to {BUSINESS_OUTCOME_RECORDS_PATH}")
-
-
 def print_business_outcome_evidence(records: list[dict]) -> None:
     print("\n=== Business Outcome Evidence ===")
     print(f"Interactions: {len(records)}")
@@ -227,14 +201,6 @@ def print_business_outcome_evidence(records: list[dict]) -> None:
     )
 
 
-def persist_pilot_evidence_records(records: list[dict]) -> None:
-    with PILOT_EVIDENCE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        for record in records:
-            output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved pilot evidence records to {PILOT_EVIDENCE_RECORDS_PATH}")
-
-
 def print_pilot_evidence(records: list[dict]) -> None:
     print("\n=== Pilot Evidence ===")
     print(f"Interactions: {len(records)}")
@@ -253,13 +219,6 @@ def print_pilot_evidence(records: list[dict]) -> None:
     print(f"Treatment assignments: {treatment}")
     print(f"Control assignments: {control}")
     print("Pilot evidence: available")
-
-
-def persist_economic_value_record(record: dict) -> None:
-    with ECONOMIC_VALUE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved economic value record to {ECONOMIC_VALUE_RECORDS_PATH}")
 
 
 def print_economic_value(record: dict) -> None:
@@ -310,18 +269,6 @@ def print_economic_value(record: dict) -> None:
     )
 
 
-def persist_incremental_economics_record(record: dict) -> None:
-    with INCREMENTAL_ECONOMICS_RECORDS_PATH.open(
-        "w", encoding="utf-8"
-    ) as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(
-        f"Saved incremental economics record to "
-        f"{INCREMENTAL_ECONOMICS_RECORDS_PATH}"
-    )
-
-
 def print_incremental_economics(record: dict) -> None:
     print("\n=== Incremental Economics ===")
 
@@ -354,13 +301,6 @@ def print_incremental_economics(record: dict) -> None:
     )
 
 
-def persist_value_resilience_record(record: dict) -> None:
-    with VALUE_RESILIENCE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved value resilience record to {VALUE_RESILIENCE_RECORDS_PATH}")
-
-
 def print_value_resilience(record: dict) -> None:
     print("\n=== Value Resilience ===")
     print(f"Scope: {record['resilience_scope'].replace('_', ' ').upper()}")
@@ -382,13 +322,6 @@ def print_value_resilience(record: dict) -> None:
     print(f"Structural Unknowns: {len(record['structural_unknowns'])}")
     for unknown in record["structural_unknowns"]:
         print(f"  - {unknown}")
-
-
-def persist_workload_assessment(record: dict) -> None:
-    with WORKLOAD_ASSESSMENT_PATH.open("w", encoding="utf-8") as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved workload assessment to {WORKLOAD_ASSESSMENT_PATH}")
 
 
 def print_workload_assessment(record: dict) -> None:
@@ -420,13 +353,6 @@ def print_workload_assessment(record: dict) -> None:
     )
 
 
-def persist_decision_gate_record(record: dict) -> None:
-    with DECISION_GATE_RECORDS_PATH.open("w", encoding="utf-8") as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved decision gate record to {DECISION_GATE_RECORDS_PATH}")
-
-
 def print_decision_gates(record: dict) -> None:
     gates = record["gates"]
 
@@ -448,15 +374,6 @@ def print_decision_gates(record: dict) -> None:
     scale_eligible = "YES" if "scale" in record["eligible_actions"] else "NO"
     print(f"Scale eligible: {scale_eligible}")
     print("Final portfolio action: NOT SELECTED")
-
-
-def persist_portfolio_action_record(record: dict) -> None:
-    with PORTFOLIO_ACTION_RECORDS_PATH.open(
-        "w", encoding="utf-8"
-    ) as output_file:
-        output_file.write(json.dumps(record) + "\n")
-
-    print(f"Saved portfolio action record to {PORTFOLIO_ACTION_RECORDS_PATH}")
 
 
 def print_portfolio_action(record: dict) -> None:
@@ -621,7 +538,7 @@ def main() -> None:
     run_id = build_run_id()
 
     # 1. Run the agent against the regression dataset and measure execution.
-    efficiency, execution_records = generate_results(run_id)
+    efficiency, execution_records, cases = generate_results(run_id)
 
     # 2. Run Foundry evaluation to measure response quality.
     run = run_cloud_evaluation(
@@ -654,11 +571,10 @@ def main() -> None:
         )
         print_accepted_work(acceptance, accepted_work)
 
-        # 4c. Join acceptance onto Execution Records, persist, and summarize.
+        # 4c. Join acceptance onto Execution Records and summarize.
         execution_records = apply_acceptance(
             execution_records, acceptance["rows"]
         )
-        persist_execution_records(execution_records)
         print_execution_evidence(execution_records)
 
         # 4d. Aggregate defensible execution economics (partial by design).
@@ -675,7 +591,6 @@ def main() -> None:
         business_outcome_records = build_business_outcome_records(
             execution_records, outcome_events=None
         )
-        persist_business_outcome_records(business_outcome_records)
         print_business_outcome_evidence(business_outcome_records)
 
         # 4f. Pilot Evidence: no pilot is running, so pilot metadata stays
@@ -683,7 +598,6 @@ def main() -> None:
         pilot_evidence_records = build_pilot_evidence_records(
             execution_records, pilot_events=None
         )
-        persist_pilot_evidence_records(pilot_evidence_records)
         print_pilot_evidence(pilot_evidence_records)
 
         # 5. Load transparent business assumptions.
@@ -713,7 +627,6 @@ def main() -> None:
             execution_economics=execution_economics,
             incremental_evidence=None,
         )
-        persist_economic_value_record(economic_value_record)
         print_economic_value(economic_value_record)
 
         # 6c. Incremental (next-dollar) economics: no proposed increment is
@@ -723,7 +636,6 @@ def main() -> None:
             decision_id=None,
             increment=None,
         )
-        persist_incremental_economics_record(incremental_economics_record)
         print_incremental_economics(incremental_economics_record)
 
         # 6d. Value Resilience: modeled scenario sensitivity only. Transparent
@@ -755,7 +667,6 @@ def main() -> None:
             assumptions=assumptions,
             stress_spec=stress_spec,
         )
-        persist_value_resilience_record(value_resilience_record)
         print_value_resilience(value_resilience_record)
 
         # 6e. Workload Assessment: synthesize independent evidence dimensions
@@ -769,7 +680,6 @@ def main() -> None:
             business_outcome_records=business_outcome_records,
             pilot_evidence_records=pilot_evidence_records,
         )
-        persist_workload_assessment(workload_assessment)
         print_workload_assessment(workload_assessment)
 
         # 7a. Decision Gates: independent DECIDE-phase constraints and action
@@ -788,7 +698,6 @@ def main() -> None:
             governance=None,
             strategic_context=None,
         )
-        persist_decision_gate_record(decision_gate_record)
         print_decision_gates(decision_gate_record)
 
         # 7b. Portfolio Action: select the action addressing the primary
@@ -805,8 +714,38 @@ def main() -> None:
             decision_owner=None,
             decision_date=datetime.now(timezone.utc).isoformat(),
         )
-        persist_portfolio_action_record(portfolio_action_record)
         print_portfolio_action(portfolio_action_record)
+
+        # 7c. Consolidate everything into the run evidence package.
+        interaction_records = build_interaction_records(
+            run_id=run_id,
+            workload_id=WORKLOAD_ID,
+            cases=cases,
+            execution_records=execution_records,
+            business_outcome_records=business_outcome_records,
+            pilot_evidence_records=pilot_evidence_records,
+        )
+        run_summary = build_run_summary(
+            run_id=run_id,
+            workload_id=WORKLOAD_ID,
+            execution_economics=execution_economics,
+            modeled_business_economics=business_economics,
+            economic_value=economic_value_record,
+            incremental_economics=incremental_economics_record,
+            value_resilience=value_resilience_record,
+            workload_assessment=workload_assessment,
+            decision_gates=decision_gate_record,
+            portfolio_action=portfolio_action_record,
+        )
+        interactions_path, summary_path = persist_run_package(
+            run_id, interaction_records, run_summary
+        )
+
+        print("\n=== Run Evidence Package ===")
+        print(f"Run ID: {run_id}")
+        print(f"Interactions: {len(interaction_records)}")
+        print(f"Saved: {interactions_path}")
+        print(f"Saved: {summary_path}")
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(
