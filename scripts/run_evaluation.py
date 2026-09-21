@@ -38,6 +38,9 @@ from foundry_prompt_agent.incremental_economics import (
 from foundry_prompt_agent.value_resilience import (
     build_value_resilience_record,
 )
+from foundry_prompt_agent.workload_assessment import (
+    build_workload_assessment,
+)
 from foundry_prompt_agent.pilot_evidence import (
     build_pilot_evidence_records,
 )
@@ -66,6 +69,7 @@ INCREMENTAL_ECONOMICS_RECORDS_PATH = Path(
 VALUE_RESILIENCE_RECORDS_PATH = Path(
     "evals/value_resilience_records_v1.jsonl"
 )
+WORKLOAD_ASSESSMENT_PATH = Path("evals/workload_assessment_v1.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
 
 
@@ -370,6 +374,42 @@ def print_value_resilience(record: dict) -> None:
         print(f"  - {unknown}")
 
 
+def persist_workload_assessment(record: dict) -> None:
+    with WORKLOAD_ASSESSMENT_PATH.open("w", encoding="utf-8") as output_file:
+        output_file.write(json.dumps(record) + "\n")
+
+    print(f"Saved workload assessment to {WORKLOAD_ASSESSMENT_PATH}")
+
+
+def print_workload_assessment(record: dict) -> None:
+    print("\n=== Workload Assessment ===")
+    print(
+        f"Technical performance: "
+        f"{record['technical_performance_status'].replace('_', ' ').upper()}"
+    )
+    print(f"Execution cost: {record['execution_cost_status'].upper()}")
+    print(f"Business outcome: {record['business_outcome_status'].upper()}")
+    print(f"Incrementality: {record['incrementality_status'].upper()}")
+    print(
+        f"Economic value: "
+        f"{record['economic_value_status'].replace('_', ' ').upper()}"
+    )
+    print(
+        f"Incremental economics: "
+        f"{record['incremental_economics_status'].replace('_', ' ').upper()}"
+    )
+    print(
+        f"Value resilience: "
+        f"{record['resilience_scope'].replace('_', ' ').upper()} / "
+        f"{record['resilience_status'].replace('_', ' ').upper()}"
+    )
+    print(f"Decision-critical gaps: {len(record['decision_gaps'])}")
+    print(
+        f"Assessment: "
+        f"{record['assessment_status'].replace('_', ' ').upper()}"
+    )
+
+
 def print_efficiency(summary: dict) -> None:
     print("\n=== Token Efficiency ===")
     print(f"Tasks: {summary['tasks']}")
@@ -653,6 +693,20 @@ def main() -> None:
         )
         persist_value_resilience_record(value_resilience_record)
         print_value_resilience(value_resilience_record)
+
+        # 6e. Workload Assessment: synthesize independent evidence dimensions
+        # without recalculating economics or selecting a portfolio action.
+        workload_assessment = build_workload_assessment(
+            workload_id=WORKLOAD_ID,
+            execution_economics=execution_economics,
+            economic_value=economic_value_record,
+            incremental_economics=incremental_economics_record,
+            value_resilience=value_resilience_record,
+            business_outcome_records=business_outcome_records,
+            pilot_evidence_records=pilot_evidence_records,
+        )
+        persist_workload_assessment(workload_assessment)
+        print_workload_assessment(workload_assessment)
 
         # 7. Store the measured + economic results for later comparison.
         history.append_run(

@@ -541,3 +541,29 @@ economically sensitive
 ```
 
 Those variables should receive priority in pilots, instrumentation, and follow-up analysis.
+
+## 49. Assessment is not scoring
+
+A workload assessment should preserve the important dimensions of evidence rather than averaging them into one universal score.
+
+```text
+Strong technical evidence
++
+weak business evidence
+```
+
+should remain visible as two different facts.
+
+## 50. A failed gate should not disappear inside an average
+
+A composite score can allow strong dimensions to compensate numerically for a decision-critical missing requirement.
+
+Some evidence gaps should remain explicit gates rather than weighted components.
+
+## 51. Synthesis should reuse evidence, not recalculate it
+
+The assessment layer should consume established technical, economic, resilience, and evidence records.
+
+It should not independently recreate their calculations.
+
+This preserves traceability and keeps one source of truth for each claim.
