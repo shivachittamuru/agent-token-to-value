@@ -1,0 +1,376 @@
+{
+  "run_id": "20260922004900",
+  "workload_id": "contoso-demand-recovery",
+  "execution_economics": {
+    "attempted_interactions": 10,
+    "accepted_interactions": 10,
+    "known_direct_execution_cost_usd": 0.06731375,
+    "known_direct_cost_per_attempt_usd": 0.006731375,
+    "known_direct_cost_per_accepted_work_usd": 0.006731375,
+    "measured_tool_calls": 14,
+    "cost_completeness": "partial",
+    "unknown_or_unallocated_components": [
+      "azure_ai_search",
+      "human_recovery",
+      "observability"
+    ]
+  },
+  "modeled_business_economics": {
+    "missed_contacts_per_day": 100,
+    "addressable_contacts_per_day": 60.0,
+    "successful_contacts_per_day": 60.0,
+    "recovered_orders_per_day": 18.0,
+    "addressable_contacts_per_month": 1800.0,
+    "successful_contacts_per_month": 1800.0,
+    "recovered_orders_per_month": 540.0,
+    "recovered_revenue_per_month": 5400.0,
+    "recovered_contribution_per_month": 1889.9999999999998,
+    "ai_inference_cost_per_month": 12.116475000000001,
+    "expected_contribution_per_success_usd": 1.0499999999999998,
+    "ai_value_multiple": 155.98596126348625,
+    "break_even_conversion_rate": 0.0019232500000000003
+  },
+  "economic_value": {
+    "run_id": "20260922004900",
+    "workload_id": "contoso-demand-recovery",
+    "value_evidence_status": "modeled_only",
+    "economic_basis_id": null,
+    "modeled_recovered_contribution_usd": 1889.9999999999998,
+    "modeled_ai_value_multiple": 155.98596126348625,
+    "incremental_orders": null,
+    "incremental_revenue_usd": null,
+    "incremental_contribution_usd": null,
+    "known_direct_execution_cost_usd": 0.06731375,
+    "cost_completeness": "partial",
+    "total_relevant_customer_cost_usd": null,
+    "customer_cost_completeness": null,
+    "customer_net_economic_value_usd": null
+  },
+  "incremental_economics": {
+    "decision_id": null,
+    "workload_id": "contoso-demand-recovery",
+    "increment_description": null,
+    "economic_basis_id": null,
+    "incremental_value_usd": null,
+    "incremental_value_evidence_status": null,
+    "incremental_customer_cost_usd": null,
+    "incremental_cost_completeness": null,
+    "incremental_net_economic_value_usd": null,
+    "economics_status": "not_established"
+  },
+  "value_resilience": {
+    "workload_id": "contoso-demand-recovery",
+    "resilience_scope": "modeled_scenario",
+    "value_evidence_status": "modeled_only",
+    "base_case": {
+      "scenario": "base",
+      "changed_inputs": {},
+      "assumptions": {
+        "missed_contacts_per_day": 100,
+        "ai_eligible_rate": 0.6,
+        "conversion_rate": 0.3,
+        "average_order_value_usd": 10.0,
+        "contribution_margin": 0.35,
+        "days_per_month": 30
+      },
+      "cost_stress_multiplier": 1.0,
+      "modeled_recovered_contribution_usd": 1889.9999999999998,
+      "modeled_ai_value_multiple": 155.98596126348625,
+      "break_even_conversion_rate": 0.0019232500000000003
+    },
+    "stress_scenarios": [
+      {
+        "scenario": "conversion_rate=0.15",
+        "changed_inputs": {
+          "conversion_rate": 0.15
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.15,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 1.0,
+        "modeled_recovered_contribution_usd": 944.9999999999999,
+        "modeled_ai_value_multiple": 77.99298063174312,
+        "break_even_conversion_rate": 0.0019232500000000003
+      },
+      {
+        "scenario": "conversion_rate=0.075",
+        "changed_inputs": {
+          "conversion_rate": 0.075
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.075,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 1.0,
+        "modeled_recovered_contribution_usd": 472.49999999999994,
+        "modeled_ai_value_multiple": 38.99649031587156,
+        "break_even_conversion_rate": 0.0019232500000000003
+      },
+      {
+        "scenario": "average_order_value_usd=8.0",
+        "changed_inputs": {
+          "average_order_value_usd": 8.0
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.3,
+          "average_order_value_usd": 8.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 1.0,
+        "modeled_recovered_contribution_usd": 1512.0,
+        "modeled_ai_value_multiple": 124.78876901078901,
+        "break_even_conversion_rate": 0.0024040625000000004
+      },
+      {
+        "scenario": "contribution_margin=0.27999999999999997",
+        "changed_inputs": {
+          "contribution_margin": 0.27999999999999997
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.3,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.27999999999999997,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 1.0,
+        "modeled_recovered_contribution_usd": 1511.9999999999998,
+        "modeled_ai_value_multiple": 124.788769010789,
+        "break_even_conversion_rate": 0.002404062500000001
+      },
+      {
+        "scenario": "cost_stress_multiplier=5.0",
+        "changed_inputs": {
+          "cost_stress_multiplier": 5.0
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.3,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 5.0,
+        "modeled_recovered_contribution_usd": 1889.9999999999998,
+        "modeled_ai_value_multiple": 31.19719225269725,
+        "break_even_conversion_rate": 0.009616250000000002
+      },
+      {
+        "scenario": "cost_stress_multiplier=10.0",
+        "changed_inputs": {
+          "cost_stress_multiplier": 10.0
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.3,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 10.0,
+        "modeled_recovered_contribution_usd": 1889.9999999999998,
+        "modeled_ai_value_multiple": 15.598596126348625,
+        "break_even_conversion_rate": 0.019232500000000003
+      },
+      {
+        "scenario": "downturn",
+        "changed_inputs": {
+          "conversion_rate": 0.15,
+          "cost_stress_multiplier": 5.0
+        },
+        "assumptions": {
+          "missed_contacts_per_day": 100,
+          "ai_eligible_rate": 0.6,
+          "conversion_rate": 0.15,
+          "average_order_value_usd": 10.0,
+          "contribution_margin": 0.35,
+          "days_per_month": 30
+        },
+        "cost_stress_multiplier": 5.0,
+        "modeled_recovered_contribution_usd": 944.9999999999999,
+        "modeled_ai_value_multiple": 15.598596126348625,
+        "break_even_conversion_rate": 0.009616250000000002
+      }
+    ],
+    "decision_sensitive_drivers": [],
+    "resilience_status": "not_classified",
+    "structural_unknowns": [
+      "real incremental conversion not established",
+      "real eligible demand baseline not established",
+      "total relevant customer cost incomplete",
+      "human/recovery economics incomplete",
+      "capacity step-functions not established"
+    ]
+  },
+  "workload_assessment": {
+    "workload_id": "contoso-demand-recovery",
+    "technical_performance_status": "established_regression",
+    "execution_cost_status": "partial",
+    "business_outcome_status": "unknown",
+    "incrementality_status": "unknown",
+    "economic_value_status": "modeled_only",
+    "incremental_economics_status": "not_established",
+    "resilience_scope": "modeled_scenario",
+    "resilience_status": "not_classified",
+    "established_claims": [
+      "Technical behavior established in the regression suite",
+      "Model inference cost measured directly from token usage"
+    ],
+    "modeled_claims": [
+      "Recovered contribution and AI Value Multiple are modeled scenario estimates",
+      "Value resilience assessed on modeled scenarios only"
+    ],
+    "unknown_claims": [
+      "Downstream business outcomes not observed",
+      "Causal/incremental conversion not established",
+      "Next-dollar (incremental) economics not established",
+      "Total relevant customer cost incomplete"
+    ],
+    "decision_gaps": [
+      "real eligible-demand baseline",
+      "real business outcomes",
+      "causal/incremental conversion",
+      "Total Relevant Customer Cost",
+      "next-dollar economics",
+      "capacity step-functions"
+    ],
+    "next_evidence_priorities": [
+      "actual eligible-demand baseline",
+      "observed order economics",
+      "treatment/control conversion",
+      "Total Relevant Customer Cost",
+      "realistic-volume capacity behavior"
+    ],
+    "assessment_status": "evidence_incomplete_for_investment_decision"
+  },
+  "decision_gates": {
+    "workload_id": "contoso-demand-recovery",
+    "decision_id": null,
+    "decision_context": "Determine what portfolio actions are supportable by the current evidence.",
+    "gates": {
+      "strategic_mandatory_gate": {
+        "status": "unknown",
+        "rationale": "No strategic/mandatory context recorded."
+      },
+      "value_gate": {
+        "status": "conditional",
+        "rationale": "Modeled scenario value only; not evidence-backed incremental value."
+      },
+      "evidence_gate": {
+        "status": "conditional",
+        "rationale": "Technical evidence strong in regression; downstream business and causal evidence remain Unknown."
+      },
+      "resilience_gate": {
+        "status": "conditional",
+        "rationale": "Modeled scenario resilience only; classification=not_classified."
+      },
+      "incremental_economics_gate": {
+        "status": "unknown",
+        "rationale": "Next-dollar incremental economics not established."
+      },
+      "commercial_fit_gate": {
+        "status": "unknown",
+        "rationale": "No commercial-fit evidence recorded."
+      },
+      "rai_risk_control_gate": {
+        "status": "unknown",
+        "rationale": "No responsible-AI/risk/control decision-gate assessment recorded."
+      }
+    },
+    "blocking_gates": [],
+    "conditional_gates": [
+      "value_gate",
+      "evidence_gate",
+      "resilience_gate"
+    ],
+    "unknown_gates": [
+      "strategic_mandatory_gate",
+      "incremental_economics_gate",
+      "commercial_fit_gate",
+      "rai_risk_control_gate"
+    ],
+    "eligible_actions": [
+      "sustain",
+      "optimize",
+      "prove",
+      "restructure",
+      "pause",
+      "retire"
+    ],
+    "ineligible_actions": [
+      {
+        "action": "scale",
+        "rationale": "Evidence-backed incremental value and next-dollar economics not established."
+      }
+    ],
+    "action_selected": false
+  },
+  "portfolio_action": {
+    "workload_id": "contoso-demand-recovery",
+    "decision_id": null,
+    "decision_context": "Determine what portfolio action is justified by the current evidence.",
+    "selected_action": "prove",
+    "primary_decision_deficit": "evidence",
+    "action_rationale": "Technical behavior is established in regression and modeled economics appear attractive, but real business outcomes, incrementality, and next-dollar economics are not established. Scale is currently ineligible, so a bounded pilot is authorized to reduce the decision-critical uncertainty.",
+    "required_work": [
+      "measure real AI-eligible unanswered demand",
+      "assign treatment/control",
+      "link downstream business outcomes",
+      "measure Total Relevant Customer Cost",
+      "capture realistic-volume operating evidence"
+    ],
+    "required_evidence": [
+      "actual eligible-demand baseline",
+      "observed order economics",
+      "treatment/control conversion",
+      "Total Relevant Customer Cost",
+      "realistic-volume capacity behavior"
+    ],
+    "resource_request": "bounded pilot instrumentation and business-outcome measurement",
+    "decision_owner": null,
+    "decision_date": "2026-09-22T00:51:55.957506+00:00",
+    "reassessment_trigger": "pilot evidence sufficient to evaluate incremental conversion, incremental contribution, Total Relevant Customer Cost, Incremental Net Economic Value, and material operational/control issues",
+    "conditions_that_change_action": [
+      {
+        "from": "prove",
+        "to": "scale",
+        "condition": "incremental economics attractive and required gates pass"
+      },
+      {
+        "from": "prove",
+        "to": "optimize",
+        "condition": "value established but execution is the primary constraint"
+      },
+      {
+        "from": "prove",
+        "to": "restructure",
+        "condition": "structural/commercial/control issues dominate"
+      },
+      {
+        "from": "prove",
+        "to": "pause",
+        "condition": "evidence cannot currently be obtained or a blocker prevents justified work"
+      },
+      {
+        "from": "prove",
+        "to": "retire",
+        "condition": "evidence removes the continuing rationale and no strategic/mandatory/dependency rationale remains"
+      }
+    ]
+  }
+}
