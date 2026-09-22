@@ -51,7 +51,7 @@ def _consolidate_interaction(
     business_outcome = {
         key: value
         for key, value in business_outcome_record.items()
-        if key not in {"interaction_id", "accepted"}
+        if key not in {"run_id", "workload_id", "interaction_id", "accepted"}
     }
     pilot = {
         key: value
@@ -83,12 +83,14 @@ def build_interaction_records(
     execution_records: list[dict],
     business_outcome_records: list[dict],
     pilot_evidence_records: list[dict],
+    run_mode: str = "regression",
 ) -> list[dict]:
     """Join per-interaction evidence into consolidated records by identity.
 
     Joins are by ``interaction_id`` (the case ``name``), never positional
     order. Duplicate execution identities, and side records that do not match
-    an execution interaction, both fail loudly.
+    an execution interaction, both fail loudly. ``run_mode`` provenance is
+    stamped on every record.
     """
 
     case_by_id = _index_by(cases, key="name", label="case")
@@ -134,18 +136,22 @@ def build_interaction_records(
                 business_outcome_record=business_outcome_record,
                 pilot_evidence_record=pilot_evidence_record,
             )
+            | {"run_mode": run_mode}
         )
 
+    # A completed run package requires exact identity coverage across all four
+    # collections; any mismatch (including a dataset case with no execution
+    # record) fails loudly.
     for label, index in (
+        ("case", case_by_id),
         ("business outcome", business_by_id),
         ("pilot evidence", pilot_by_id),
     ):
-        for interaction_id in index:
-            if interaction_id not in seen:
-                raise ValueError(
-                    f"{label} identity has no execution record: "
-                    f"{interaction_id!r}"
-                )
+        extra = set(index) - seen
+        if extra:
+            raise ValueError(
+                f"{label} identities have no execution record: {sorted(extra)}"
+            )
 
     return records
 
@@ -162,12 +168,16 @@ def build_run_summary(
     workload_assessment: dict,
     decision_gates: dict,
     portfolio_action: dict,
+    run_mode: str = "regression",
+    simulation: dict | None = None,
 ) -> dict:
     """Assemble the run-level summary, preserving each section's exact values."""
 
     return {
         "run_id": run_id,
         "workload_id": workload_id,
+        "run_mode": run_mode,
+        "simulation": simulation,
         "execution_economics": execution_economics,
         "modeled_business_economics": modeled_business_economics,
         "economic_value": economic_value,

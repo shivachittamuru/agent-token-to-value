@@ -121,6 +121,33 @@ def test_business_outcome_unknowns_remain_null():
     assert "accepted" not in record["business_outcome"]
 
 
+def test_business_outcome_omits_redundant_identity_fields():
+    record = build()[0]
+
+    for field in ("run_id", "workload_id", "interaction_id"):
+        assert field not in record["business_outcome"]
+
+
+def test_extra_dataset_case_without_execution_fails():
+    with pytest.raises(ValueError):
+        build_interaction_records(
+            run_id="run1",
+            workload_id="w",
+            # An extra case "beta" has no matching execution record.
+            cases=[case(name="alpha"), case(name="beta")],
+            execution_records=[execution_record("alpha")],
+            business_outcome_records=[business_outcome_record("alpha")],
+            pilot_evidence_records=[pilot_evidence_record("alpha")],
+        )
+
+
+def test_all_four_identity_sets_matching_succeeds():
+    records = build(ids=("alpha", "beta"))
+
+    assert {r["interaction_id"] for r in records} == {"alpha", "beta"}
+
+
+
 def test_interaction_join_is_by_id_not_ordering():
     records = build_interaction_records(
         run_id="run1",

@@ -92,8 +92,9 @@ def load_dataset(path: Path) -> list[dict]:
         ]
 
 
-def generate_results(run_id: str) -> tuple[dict, list[dict], list[dict]]:
-    cases = load_dataset(DATASET_PATH)
+def run_agent_over_cases(
+    cases: list[dict], run_id: str
+) -> tuple[dict, list[dict]]:
     usages = []
     entries = []
 
@@ -105,9 +106,12 @@ def generate_results(run_id: str) -> tuple[dict, list[dict], list[dict]]:
             usages.append(execution)
             entries.append((case, execution))
 
-            # Foundry validates every uploaded field, so execution stays local.
+            # Upload only the evaluator schema fields; provenance stays local.
             result = {
-                **case,
+                "name": case["name"],
+                "category": case.get("category"),
+                "query": case["query"],
+                "ground_truth": case["ground_truth"],
                 "response": response,
             }
 
@@ -120,7 +124,7 @@ def generate_results(run_id: str) -> tuple[dict, list[dict], list[dict]]:
 
     # Execution Records start with acceptance unknown; joined post-evaluation.
     execution_records = build_execution_records(run_id, entries)
-    return efficiency, execution_records, cases
+    return efficiency, execution_records
 
 
 def print_execution_evidence(records: list[dict]) -> None:
@@ -525,31 +529,21 @@ def build_history_record(
     }
 
 
-def main() -> None:
-    judge_model = os.environ["FOUNDRY_JUDGE_MODEL"]
+def process_completed_run(
+    *,
+    run_id: str,
+    cases: list[dict],
+    efficiency: dict,
+    execution_records: list[dict],
+    run,
+    run_mode: str = "regression",
+    simulation_metadata: dict | None = None,
+) -> None:
+    """Run the full evidence pipeline for a completed evaluation and persist it.
 
-    behavior_threshold = float(
-        os.getenv("BEHAVIOR_PASS_RATE_THRESHOLD", "0.90")
-    )
-    scope_threshold = float(
-        os.getenv("SCOPE_PASS_RATE_THRESHOLD", "1.00")
-    )
-
-    run_id = build_run_id()
-
-    # 1. Run the agent against the regression dataset and measure execution.
-    efficiency, execution_records, cases = generate_results(run_id)
-
-    # 2. Run Foundry evaluation to measure response quality.
-    run = run_cloud_evaluation(
-        project_client,
-        results_path=RESULTS_PATH,
-        run_id=run_id,
-        judge_model=judge_model,
-    )
-
-    print(f"Final status: {run.status}")
-    print(f"Foundry report: {run.report_url}")
+    Shared by the fixed regression runner and the synthetic workload simulator.
+    Only the tokenomics history append is regression-specific.
+    """
 
     if run.status == "completed":
         # 3. Measured quality signal.
@@ -724,6 +718,7 @@ def main() -> None:
             execution_records=execution_records,
             business_outcome_records=business_outcome_records,
             pilot_evidence_records=pilot_evidence_records,
+            run_mode=run_mode,
         )
         run_summary = build_run_summary(
             run_id=run_id,
@@ -736,31 +731,74 @@ def main() -> None:
             workload_assessment=workload_assessment,
             decision_gates=decision_gate_record,
             portfolio_action=portfolio_action_record,
+            run_mode=run_mode,
+            simulation=simulation_metadata,
         )
         interactions_path, summary_path = persist_run_package(
             run_id, interaction_records, run_summary
         )
 
         print("\n=== Run Evidence Package ===")
+        print(f"Mode: {run_mode.upper()}")
         print(f"Run ID: {run_id}")
         print(f"Interactions: {len(interaction_records)}")
         print(f"Saved: {interactions_path}")
         print(f"Saved: {summary_path}")
 
-        # 7. Store the measured + economic results for later comparison.
-        history.append_run(
-            build_history_record(
-                run_id,
-                efficiency,
-                effectiveness,
-                assumptions,
-                business_economics,
+        # 7. Store the measured + economic results for later comparison. Only
+        # the fixed regression suite feeds the tokenomics history / dashboard.
+        if run_mode == "regression":
+            history.append_run(
+                build_history_record(
+                    run_id,
+                    efficiency,
+                    effectiveness,
+                    assumptions,
+                    business_economics,
+                )
             )
-        )
 
-        print(f"\nAppended tokenomics run to {history.HISTORY_PATH}")
+            print(f"\nAppended tokenomics run to {history.HISTORY_PATH}")
 
-    # 8. CI quality gate remains separate from the economics.
+
+def main() -> None:
+    judge_model = os.environ["FOUNDRY_JUDGE_MODEL"]
+
+    behavior_threshold = float(
+        os.getenv("BEHAVIOR_PASS_RATE_THRESHOLD", "0.90")
+    )
+    scope_threshold = float(
+        os.getenv("SCOPE_PASS_RATE_THRESHOLD", "1.00")
+    )
+
+    run_id = build_run_id()
+
+    # 1. Run the agent against the fixed regression dataset and measure it.
+    cases = load_dataset(DATASET_PATH)
+    efficiency, execution_records = run_agent_over_cases(cases, run_id)
+
+    # 2. Run Foundry evaluation to measure response quality.
+    run = run_cloud_evaluation(
+        project_client,
+        results_path=RESULTS_PATH,
+        run_id=run_id,
+        judge_model=judge_model,
+    )
+
+    print(f"Final status: {run.status}")
+    print(f"Foundry report: {run.report_url}")
+
+    # 3. Run the shared evidence pipeline and persist the run package.
+    process_completed_run(
+        run_id=run_id,
+        cases=cases,
+        efficiency=efficiency,
+        execution_records=execution_records,
+        run=run,
+        run_mode="regression",
+    )
+
+    # 4. CI quality gate remains separate from the economics.
     enforce_quality_gate(
         run,
         behavior_threshold=behavior_threshold,
