@@ -25,6 +25,14 @@ uv run pytest -q
 uv run scripts/run_evaluation.py
 ```
 
+## Dashboard
+
+```bash
+uv run streamlit run apps/value_to_action_dashboard.py
+```
+
+Use the dashboard to follow a run through MEASURE → PROVE → VALUE → TEST → DECIDE → ACT.
+
 ## Observe
 
 ### 1. MEASURE
