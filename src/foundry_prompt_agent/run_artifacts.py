@@ -169,6 +169,7 @@ def build_run_summary(
     decision_gates: dict,
     portfolio_action: dict,
     run_mode: str = "regression",
+    evidence_mode: str = "measured_regression",
     simulation: dict | None = None,
 ) -> dict:
     """Assemble the run-level summary, preserving each section's exact values."""
@@ -177,6 +178,7 @@ def build_run_summary(
         "run_id": run_id,
         "workload_id": workload_id,
         "run_mode": run_mode,
+        "evidence_mode": evidence_mode,
         "simulation": simulation,
         "execution_economics": execution_economics,
         "modeled_business_economics": modeled_business_economics,

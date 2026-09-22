@@ -204,9 +204,15 @@ def _action_rationale(
     action: str, deficit: str, workload_assessment: dict
 ) -> str:
     if action == "prove":
+        scope = workload_assessment.get("technical_evidence_scope", "regression")
+        scope_phrase = (
+            "simulated workload"
+            if scope == "simulation"
+            else "regression workload"
+        )
         return (
-            "Technical behavior is established in regression and modeled "
-            "economics appear attractive, but real business outcomes, "
+            f"Technical behavior is established for the {scope_phrase} and "
+            "modeled economics appear attractive, but real business outcomes, "
             "incrementality, and next-dollar economics are not established. "
             "Scale is currently ineligible, so a bounded pilot is authorized "
             "to reduce the decision-critical uncertainty."

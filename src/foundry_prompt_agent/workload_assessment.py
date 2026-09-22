@@ -12,8 +12,12 @@ from __future__ import annotations
 
 from foundry_prompt_agent.business_outcomes import DOWNSTREAM_FIELDS
 
-TECHNICAL_ESTABLISHED = "established_regression"
+TECHNICAL_ESTABLISHED = "established"
 TECHNICAL_UNKNOWN = "unknown"
+
+# Provenance of the technical evidence, kept separate from its status.
+TECHNICAL_SCOPE_REGRESSION = "regression"
+TECHNICAL_SCOPE_SIMULATION = "simulation"
 
 BUSINESS_OUTCOME_OBSERVED = "observed"
 BUSINESS_OUTCOME_UNKNOWN = "unknown"
@@ -79,15 +83,23 @@ def build_workload_assessment(
     value_resilience: dict,
     business_outcome_records: list[dict],
     pilot_evidence_records: list[dict],
+    run_mode: str = "regression",
 ) -> dict:
     """Synthesize existing evidence records into a structured assessment.
 
     Each dimension preserves its source record's evidence state. No economics
-    are recalculated and no portfolio action is selected.
+    are recalculated and no portfolio action is selected. ``run_mode`` sets the
+    technical evidence scope (regression vs. simulation) without changing the
+    technical evidence status.
     """
 
     technical_performance_status = _technical_performance_status(
         business_outcome_records
+    )
+    technical_evidence_scope = (
+        TECHNICAL_SCOPE_SIMULATION
+        if run_mode == "simulation"
+        else TECHNICAL_SCOPE_REGRESSION
     )
     execution_cost_status = execution_economics["cost_completeness"]
     business_outcome_status = _business_outcome_status(business_outcome_records)
@@ -101,9 +113,14 @@ def build_workload_assessment(
 
     established_claims = []
     if technical_performance_status == TECHNICAL_ESTABLISHED:
-        established_claims.append(
-            "Technical behavior established in the regression suite"
-        )
+        if technical_evidence_scope == TECHNICAL_SCOPE_SIMULATION:
+            established_claims.append(
+                "Technical behavior established for the simulated workload"
+            )
+        else:
+            established_claims.append(
+                "Technical behavior established in the regression suite"
+            )
     established_claims.append(
         "Model inference cost measured directly from token usage"
     )
@@ -160,6 +177,7 @@ def build_workload_assessment(
     return {
         "workload_id": workload_id,
         "technical_performance_status": technical_performance_status,
+        "technical_evidence_scope": technical_evidence_scope,
         "execution_cost_status": execution_cost_status,
         "business_outcome_status": business_outcome_status,
         "incrementality_status": incrementality_status,

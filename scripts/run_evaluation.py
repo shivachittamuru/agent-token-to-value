@@ -673,6 +673,7 @@ def process_completed_run(
             value_resilience=value_resilience_record,
             business_outcome_records=business_outcome_records,
             pilot_evidence_records=pilot_evidence_records,
+            run_mode=run_mode,
         )
         print_workload_assessment(workload_assessment)
 
@@ -732,6 +733,11 @@ def process_completed_run(
             decision_gates=decision_gate_record,
             portfolio_action=portfolio_action_record,
             run_mode=run_mode,
+            evidence_mode=(
+                "synthetic_simulation"
+                if run_mode == "simulation"
+                else "measured_regression"
+            ),
             simulation=simulation_metadata,
         )
         interactions_path, summary_path = persist_run_package(

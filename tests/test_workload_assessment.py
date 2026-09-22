@@ -77,7 +77,8 @@ def build(**overrides) -> dict:
 def test_current_contoso_assessment():
     record = build()
 
-    assert record["technical_performance_status"] == "established_regression"
+    assert record["technical_performance_status"] == "established"
+    assert record["technical_evidence_scope"] == "regression"
     assert record["execution_cost_status"] == "partial"
     assert record["business_outcome_status"] == "unknown"
     assert record["incrementality_status"] == "unknown"
@@ -87,11 +88,35 @@ def test_current_contoso_assessment():
     assert record["resilience_status"] == "not_classified"
 
 
+def test_regression_scope_preserved():
+    record = build(run_mode="regression")
+
+    assert record["technical_evidence_scope"] == "regression"
+    assert any("regression suite" in claim for claim in record["established_claims"])
+
+
+def test_simulation_scope_preserved():
+    record = build(run_mode="simulation")
+
+    assert record["technical_performance_status"] == "established"
+    assert record["technical_evidence_scope"] == "simulation"
+    assert any(
+        "simulated workload" in claim for claim in record["established_claims"]
+    )
+
+
+def test_simulation_assessment_has_no_regression_wording():
+    record = build(run_mode="simulation")
+
+    for claim in record["established_claims"]:
+        assert "regression" not in claim.lower()
+
+
 def test_strong_technical_evidence_does_not_promote_business():
     # All accepted, but downstream and economic evidence stay weak.
     record = build(business_outcome_records=business_outcome_records(accepted=True))
 
-    assert record["technical_performance_status"] == "established_regression"
+    assert record["technical_performance_status"] == "established"
     assert record["business_outcome_status"] == "unknown"
     assert record["economic_value_status"] == "modeled_only"
 

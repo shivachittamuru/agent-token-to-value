@@ -234,6 +234,31 @@ def test_summary_preserves_all_run_level_sections():
     assert summary["portfolio_action"]["selected_action"] == "prove"
 
 
+def test_summary_evidence_mode_is_explicit():
+    regression = summary_sections()
+    simulation = build_run_summary(
+        run_id="run2",
+        workload_id="w",
+        execution_economics={},
+        modeled_business_economics={},
+        economic_value={},
+        incremental_economics={},
+        value_resilience={},
+        workload_assessment={},
+        decision_gates={},
+        portfolio_action={},
+        run_mode="simulation",
+        evidence_mode="synthetic_simulation",
+        simulation={"seed": 42, "count": 20, "generator_version": "1"},
+    )
+
+    assert regression["run_mode"] == "regression"
+    assert regression["evidence_mode"] == "measured_regression"
+    assert simulation["run_mode"] == "simulation"
+    assert simulation["evidence_mode"] == "synthetic_simulation"
+    assert simulation["simulation"]["seed"] == 42
+
+
 def test_persistence_layer_does_not_recalculate_economics():
     original = {"ai_value_multiple": 134.7, "recovered_contribution_per_month": 1890.0}
     summary = build_run_summary(

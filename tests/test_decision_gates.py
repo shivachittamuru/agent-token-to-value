@@ -11,13 +11,15 @@ CONTEXT = "Determine what portfolio actions are supportable by the current evide
 
 
 def workload_assessment(
-    technical="established_regression",
+    technical="established",
     business="unknown",
     incrementality="unknown",
     economic_value="modeled_only",
+    technical_evidence_scope="regression",
 ) -> dict:
     return {
         "technical_performance_status": technical,
+        "technical_evidence_scope": technical_evidence_scope,
         "business_outcome_status": business,
         "incrementality_status": incrementality,
         "economic_value_status": economic_value,
@@ -172,3 +174,15 @@ def test_gate_rationales_preserved():
     for gate in record["gates"].values():
         assert gate["rationale"]
         assert isinstance(gate["rationale"], str)
+
+
+def test_simulation_evidence_gate_rationale_has_no_regression_wording():
+    record = build(
+        workload_assessment=workload_assessment(
+            technical_evidence_scope="simulation"
+        )
+    )
+
+    rationale = record["gates"]["evidence_gate"]["rationale"].lower()
+    assert "regression" not in rationale
+    assert "simulation" in rationale

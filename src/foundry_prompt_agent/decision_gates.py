@@ -65,11 +65,12 @@ def _value_gate(economic_value_status: str) -> dict:
 
 def _evidence_gate(workload_assessment: dict) -> dict:
     technical = workload_assessment["technical_performance_status"]
+    scope = workload_assessment.get("technical_evidence_scope", "regression")
     business = workload_assessment["business_outcome_status"]
     incrementality = workload_assessment["incrementality_status"]
 
     if (
-        technical == "established_regression"
+        technical == "established"
         and business == "observed"
         and incrementality == "established"
     ):
@@ -77,8 +78,8 @@ def _evidence_gate(workload_assessment: dict) -> dict:
     if business == "unknown" or incrementality == "unknown":
         return _gate(
             GATE_CONDITIONAL,
-            "Technical evidence strong in regression; downstream business and "
-            "causal evidence remain Unknown.",
+            f"Technical evidence strong for the {scope} workload; downstream "
+            "business and causal evidence remain Unknown.",
         )
     return _gate(GATE_CONDITIONAL, "Partial evidence across dimensions.")
 

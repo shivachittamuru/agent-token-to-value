@@ -12,15 +12,17 @@ ALL_ACTIONS = ["sustain", "optimize", "prove", "restructure", "pause", "retire"]
 
 
 def assessment(
-    technical="established_regression",
+    technical="established",
     business="unknown",
     incrementality="unknown",
     economic_value="modeled_only",
     incremental_economics="not_established",
+    technical_evidence_scope="regression",
     **hints,
 ) -> dict:
     base = {
         "technical_performance_status": technical,
+        "technical_evidence_scope": technical_evidence_scope,
         "business_outcome_status": business,
         "incrementality_status": incrementality,
         "economic_value_status": economic_value,
@@ -237,6 +239,16 @@ def test_action_rationale_traceable_to_evidence():
 
     assert "regression" in rationale
     assert "scale" in rationale
+
+
+def test_simulation_action_rationale_has_no_regression_wording():
+    record = build(
+        workload_assessment=assessment(technical_evidence_scope="simulation")
+    )
+    rationale = record["action_rationale"].lower()
+
+    assert "regression" not in rationale
+    assert "simulated workload" in rationale
 
 
 def test_no_composite_score_field():
