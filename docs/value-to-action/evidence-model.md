@@ -140,6 +140,18 @@ Sustain, Pause, and Retire are also valid. Every action needs a reassessment tri
 Unknown ≠ Zero ≠ False ≠ Not Applicable
 ```
 
+## Status vs. scope
+
+Evidence carries a **status** (was the claim demonstrated?) and a separate **scope** (in what world?). They are never collapsed.
+
+```text
+technical_performance_status = established     technical_evidence_scope     = simulation
+business_outcome_status      = observed        business_evidence_scope      = simulation
+incrementality_status        = established     incrementality_evidence_scope = simulation
+```
+
+Here each claim is established/observed **inside simulation scope**, not production scope. A status can be established within simulation while the production-scope equivalent stays Unknown — so synthetic evidence never removes the real-world decision gaps.
+
 ## Implementation map
 
 | Module | Responsibility |
@@ -154,5 +166,22 @@ Unknown ≠ Zero ≠ False ≠ Not Applicable
 | `workload_assessment.py` | evidence synthesis |
 | `decision_gates.py` | gate readiness and action eligibility |
 | `portfolio_action.py` | action selection and reassessment |
+| `synthetic_inquiries.py` | seeded synthetic inquiry generation (no LLM) |
+| `synthetic_outcomes.py` | synthetic treatment/control assignment and outcomes |
+| `synthetic_economics.py` | synthetic population-level economics |
+| `run_artifacts.py` | build and persist the run evidence package |
+| `run_reader.py` | read-only loader for run packages |
+| `dashboard_views.py` | pure presentation helpers |
+| `apps/value_to_action_dashboard.py` | participant-facing dashboard |
 
-The current JSONL files are implementation artifacts created while the contracts were developed. They are not required participant reading.
+## Storage
+
+Each run persists one evidence package:
+
+```text
+runs/<run_id>/
+  interactions.jsonl   per-interaction execution, acceptance, pilot and outcome evidence
+  summary.json         run-level economics, evidence assessment, resilience, gates and action
+```
+
+For simulation runs the summary also carries `synthetic_experiment` and `synthetic_economics` sections plus explicit `run_mode` / `evidence_mode` provenance.

@@ -1,14 +1,29 @@
-# Foundry Prompt Agent — From Agent Quality to Token Economics
+# Foundry Prompt Agent — From Agent Quality to Value-to-Action
 
-A small learning project that walks through the **Microsoft Foundry Prompt Agent lifecycle (ADLC)** using a simple *Contoso Coffee* assistant backed by **Azure AI Search** — and then extends that lifecycle into **token economics**.
+A small learning project that walks through the **Microsoft Foundry Prompt Agent lifecycle (ADLC)** using a simple *Contoso Coffee* assistant backed by **Azure AI Search** — and then grows, in layers, from agent quality into token economics and finally into evidence-backed business decisions.
 
-The project starts with a familiar agent question:
+The project tells one integrated story:
+
+```text
+AGENT QUALITY      Does the agent work reliably?
+      ↓
+TOKEN-TO-VALUE     What did useful AI work consume, and what might it be worth?
+      ↓
+VALUE-TO-ACTION    Did the business change, was it incremental, what was it
+                   worth, how strong is the evidence, and what action is justified?
+```
+
+It starts with a familiar agent question:
 
 > **Does the agent work reliably?**
 
-and deliberately pushes one step further:
+pushes into economics:
 
-> **Is the AI economically worth operating?**
+> **What did useful AI work cost, and what might it be worth?**
+
+and deliberately goes one step further:
+
+> **Did the business change, was the change incremental, and what action is justified by the evidence?**
 
 The tokenomics story is built around a realistic local-business scenario: a coffee shop may receive more menu-related calls and inquiries than staff can answer during peak periods. The baseline is not necessarily “replace a human worker.” It may be:
 
@@ -36,13 +51,16 @@ The core optimization goal is:
 
 ## Project versions
 
-The original Token-to-Value implementation is preserved as the Git tag:
+The project grows in layers, and each checkpoint preserves the previous one.
 
-`token-to-value-v1`
+- `token-to-value-v1` — the original Token-to-Value implementation (Git tag).
+- `value-to-action-v1` — the tag intended after `feature/value-to-action` is merged to main: Accepted Work, the run-centric evidence package, the Value-to-Action methodology, simulation, and the Value-to-Action dashboard.
 
-Value-to-Action development continues on:
+Value-to-Action is currently being completed on **`feature/value-to-action`**.
 
-`feature/value-to-action`
+The next intended branch is **`feature/finops-cost-integration`**, which will extend technical/runtime cost coverage rather than redefine the methodology. It is not yet implemented.
+
+See [docs/project_versions.md](docs/project_versions.md) for details.
 
 ---
 
@@ -101,11 +119,34 @@ Recovered contribution
 AI Value Multiple
          ↓
 Report / Streamlit dashboard
+
+
+                    VALUE-TO-ACTION
+
+Foundry Agent
+      ↓
+evaluation
+      ↓
+Accepted Work
+      ↓
+Token-to-Value
+      ↓
+Business Outcome
+      ↓
+Incrementality
+      ↓
+Economic Value
+      ↓
+Evidence / Resilience
+      ↓
+Decision Gates
+      ↓
+Portfolio Action
 ```
 
 The Python side invokes the persisted agent and drives evaluation. Foundry owns the managed agent runtime, model/tool execution, evaluator catalog, and evaluation-result persistence.
 
-The repository then adds the application-specific economics layer.
+The repository then adds the application-specific economics and Value-to-Action evidence layers. The Value-to-Action methodology is documented in [docs/value-to-action/README.md](docs/value-to-action/README.md).
 
 ---
 
@@ -121,10 +162,27 @@ Only the parts that matter for understanding the flow:
 | [src/foundry_prompt_agent/business_economics.py](src/foundry_prompt_agent/business_economics.py) | Coffee-shop demand-recovery economics: recovered orders, contribution, AI Value Multiple, and break-even conversion. |
 | [src/foundry_prompt_agent/foundry_eval.py](src/foundry_prompt_agent/foundry_eval.py) | Foundry evaluation mechanics: dataset upload, evaluation run, polling, pass rates, and the quality gate. |
 | [src/foundry_prompt_agent/history.py](src/foundry_prompt_agent/history.py) | Reads and appends the tokenomics experiment ledger, ignoring rows from older schemas. |
-| [scripts/run_evaluation.py](scripts/run_evaluation.py) | Main evaluation entrypoint: runs the agent, measures token usage, runs Foundry evaluators, enforces quality gates, and persists run history. |
+| [src/foundry_prompt_agent/execution.py](src/foundry_prompt_agent/execution.py) | Execution evidence records, cost attribution, and applied execution economics. |
+| [src/foundry_prompt_agent/business_outcomes.py](src/foundry_prompt_agent/business_outcomes.py) | Downstream business-outcome evidence contract. |
+| [src/foundry_prompt_agent/pilot_evidence.py](src/foundry_prompt_agent/pilot_evidence.py) | Pilot / experiment (treatment-control) evidence context. |
+| [src/foundry_prompt_agent/economic_value.py](src/foundry_prompt_agent/economic_value.py) | Economic value contract: modeled, incremental, and Customer Net Economic Value. |
+| [src/foundry_prompt_agent/incremental_economics.py](src/foundry_prompt_agent/incremental_economics.py) | Next-dollar (incremental) economics. |
+| [src/foundry_prompt_agent/value_resilience.py](src/foundry_prompt_agent/value_resilience.py) | Modeled-scenario sensitivity and break-even resilience. |
+| [src/foundry_prompt_agent/workload_assessment.py](src/foundry_prompt_agent/workload_assessment.py) | Evidence synthesis with separate status and scope. |
+| [src/foundry_prompt_agent/decision_gates.py](src/foundry_prompt_agent/decision_gates.py) | Independent decision gates and action eligibility. |
+| [src/foundry_prompt_agent/portfolio_action.py](src/foundry_prompt_agent/portfolio_action.py) | Portfolio action selection and reassessment trigger. |
+| [src/foundry_prompt_agent/synthetic_inquiries.py](src/foundry_prompt_agent/synthetic_inquiries.py) | Seeded synthetic inquiry generation (no LLM). |
+| [src/foundry_prompt_agent/synthetic_outcomes.py](src/foundry_prompt_agent/synthetic_outcomes.py) | Synthetic treatment/control assignment and business outcomes. |
+| [src/foundry_prompt_agent/synthetic_economics.py](src/foundry_prompt_agent/synthetic_economics.py) | Synthetic population-level economics. |
+| [src/foundry_prompt_agent/run_artifacts.py](src/foundry_prompt_agent/run_artifacts.py) | Builds and persists the consolidated run evidence package. |
+| [src/foundry_prompt_agent/run_reader.py](src/foundry_prompt_agent/run_reader.py) | Read-only loader for run evidence packages. |
+| [scripts/run_evaluation.py](scripts/run_evaluation.py) | Regression entrypoint: agent execution, Foundry evaluation, Accepted Work, execution/business/pilot evidence, Value-to-Action assessment, and the run package. |
+| [scripts/run_simulation.py](scripts/run_simulation.py) | Simulation entrypoint: seeded synthetic inquiries with real execution/evaluation and synthetic business evidence. |
 | [scripts/generate_economics_report.py](scripts/generate_economics_report.py) | Generates a Markdown economics report from the latest measured run without calling the model again. |
 | [scripts/plot_tokenomics.py](scripts/plot_tokenomics.py) | Plots tokenomics trends across historical evaluation runs. |
-| [apps/dashboard.py](apps/dashboard.py) | Interactive Streamlit dashboard for scenario analysis and run/agent comparison. |
+| [apps/dashboard.py](apps/dashboard.py) | Token Economics dashboard: scenario analysis and run/agent comparison. |
+| [apps/value_to_action_dashboard.py](apps/value_to_action_dashboard.py) | Value-to-Action dashboard: walks a run through MEASURE → PROVE → VALUE → TEST → DECIDE → ACT. |
+| [runs/](runs/) | Consolidated per-run evidence packages (`interactions.jsonl` + `summary.json`). |
 | [economics/business_assumptions.yaml](economics/business_assumptions.yaml) | Explicit business assumptions used by the economics model. |
 | [evals/](evals/) | Curated regression datasets, generated responses, and tokenomics run history. |
 | [evals/tokenomics_history.jsonl](evals/tokenomics_history.jsonl) | Append-only experiment ledger containing measured AI metrics, assumptions, and modeled economics. |
@@ -221,36 +279,45 @@ This confirms the Foundry endpoint, agent reference, Azure authentication, and r
 
 ## Running evaluations
 
+[scripts/run_evaluation.py](scripts/run_evaluation.py) is the regression entrypoint. It does more than the original tokenomics loop — in one pass it:
+
+- loads the fixed regression cases and runs the **real** agent,
+- runs **Foundry evaluation** and computes **Accepted Work** (task success + mandatory guardrails),
+- builds execution evidence, cost attribution, and applied execution economics,
+- builds business-outcome and pilot evidence records (Unknown unless supplied),
+- runs the **Value-to-Action** assessment, decision gates, and portfolio action,
+- writes a consolidated **run package** and appends the regression tokenomics history,
+- enforces the CI quality thresholds and exits non-zero on regression.
+
+Only the quality gate can fail the build; the evidence and economics are recorded for analysis, never enforced. A Foundry report URL is printed for diagnosis.
+
+### Two execution modes
+
+Both modes use **real** agent execution and **real** technical evaluation. They differ only in downstream business evidence.
+
+**Regression** — fixed known benchmark; business evidence stays Unknown unless supplied:
+
 ```bash
 uv run scripts/run_evaluation.py
 ```
 
-[scripts/run_evaluation.py](scripts/run_evaluation.py) performs the core measurement loop:
+**Simulation** — seeded synthetic inquiries, plus synthetic treatment/control, business outcomes, and population economics, all with explicit synthetic provenance and never treated as production business evidence:
 
-1. Loads the curated regression dataset from `evals/`.
-2. Invokes the persisted agent for every case.
-3. Captures actual token usage and computes token cost.
-4. Uploads generated responses to Foundry.
-5. Runs the custom Foundry evaluators:
-   - `contoso_behavior_rubric`
-   - `contoso_scope_adherence`
-6. Calculates:
-   - tokens per interaction,
-   - cost per interaction,
-   - behavior success rate,
-   - tokens per successful resolution,
-   - cost per successful resolution.
-7. Combines measured AI performance with the configured business assumptions.
-8. Calculates modeled demand recovery and token economics.
-9. Appends the run to `evals/tokenomics_history.jsonl`.
-10. Enforces the CI quality thresholds and exits non-zero on regression.
+```bash
+uv run scripts/run_simulation.py --seed 42 --outcome-seed 4201 --count 20
+```
 
-Only step 10 can fail the build. Behavior and scope pass rates are the gates; the
-business economics are recorded for analysis, never enforced.
+### Run package
 
-A Foundry report URL is printed for diagnosis.
+Each run persists one evidence package:
 
-See [docs/evaluation.md](docs/evaluation.md) for the evaluation design and evaluator rationale.
+```text
+runs/<run_id>/
+  interactions.jsonl   per-interaction execution, acceptance, pilot and outcome evidence
+  summary.json         run-level economics, evidence assessment, resilience, gates and action
+```
+
+See [docs/evaluation.md](docs/evaluation.md) for the evaluation design and evaluator rationale, and [docs/value-to-action/README.md](docs/value-to-action/README.md) for the evidence methodology.
 
 ---
 
@@ -391,15 +458,23 @@ Business sensitivity analysis therefore costs no additional inference tokens.
 
 ---
 
-## Interactive tokenomics dashboard
+## Dashboards
 
-For interactive scenario exploration:
+Two separate read-only Streamlit dashboards. Neither calls the agent or Foundry.
+
+**Token Economics** — explore scenario / token economics locally:
 
 ```bash
 uv run streamlit run apps/dashboard.py
 ```
 
-The Streamlit dashboard reads the same measured history and performs all scenario modeling locally.
+**Value-to-Action** — walk a run's evidence through MEASURE → PROVE → VALUE → TEST → DECIDE → ACT:
+
+```bash
+uv run streamlit run apps/value_to_action_dashboard.py
+```
+
+The Token Economics dashboard reads the same measured history and performs all scenario modeling locally.
 
 ### Business Economics tab
 
@@ -531,9 +606,29 @@ Automate
   ↓
 GitHub Actions regression gates
 
-Measure Economics
+Measure
   ↓
-Tokens → quality → business value
+Tokens → quality → Accepted Work → execution cost
+
+Prove
+  ↓
+Business outcome and counterfactual evidence
+
+Value
+  ↓
+Modeled, incremental, and decision-grade economics
+
+Test
+  ↓
+Evidence confidence and value resilience
+
+Decide
+  ↓
+Independent decision gates and action eligibility
+
+Act
+  ↓
+Portfolio action with a reassessment trigger
 ```
 
 The recurring theme is:
@@ -552,6 +647,8 @@ Conceptual notes under [docs/](docs/):
 - [docs/automation.md](docs/automation.md) — scheduled regression, GitHub Actions, OIDC federation, and CI quality gates.
 - **[docs/token_to_value_ladder.md](docs/token_to_value_ladder.md)** — the reusable tokenomics framework from token spend to economic value.
 - **[docs/business_case_and_economics.md](docs/business_case_and_economics.md)** — the Contoso Coffee demand-recovery business case, assumptions, AI Value Multiple, break-even analysis, sensitivity, and demo story.
+- **[docs/value-to-action/README.md](docs/value-to-action/README.md)** — the Value-to-Action methodology (MEASURE → PROVE → VALUE → TEST → DECIDE → ACT), two evidence modes, and the dashboard.
+- **[docs/value-to-action/workshop.md](docs/value-to-action/workshop.md)** — a short, run-it participant workshop.
 
 A useful reading order is:
 
@@ -567,6 +664,10 @@ automation.md
 token_to_value_ladder.md
         ↓
 business_case_and_economics.md
+        ↓
+value-to-action/README.md
+        ↓
+value-to-action/workshop.md
 ```
 
 ---
@@ -582,21 +683,22 @@ Agent answered correctly.
 This project pushes further:
 
 ```text
-Did it answer correctly?
-        ↓
-What did that interaction cost?
-        ↓
-What did a successful interaction cost?
-        ↓
-What business outcome might it support?
-        ↓
-How much recovered contribution
-do we get per dollar of inference?
+Capability
+    ↓
+Useful Work
+    ↓
+Economics
+    ↓
+Evidence
+    ↓
+Decision
+    ↓
+Action
 ```
 
 That is the project's main value proposition:
 
-> **Move from agent capability to agent accountability — technically through evaluation, and economically through token-to-value measurement.**
+> **Move from agent capability to agent accountability — technically through evaluation, economically through token-to-value measurement, and finally through evidence-graded decisions and a justified action.**
 
 ---
 
@@ -604,7 +706,7 @@ That is the project's main value proposition:
 
 Keep future extensions small and evidence-driven:
 
-- Grow the regression dataset from real traces and failure cases.
-- Compare prompt/model/agent configurations using quality + economic metrics rather than token cost alone.
-- Add real business measurements if the scenario is ever piloted with an actual operator.
-- Extend the current inference-cost model into fully loaded economics only when review, operational, and failure/risk costs can be grounded in evidence.
+- Integrate broader Azure runtime cost evidence (the intended `feature/finops-cost-integration` work).
+- Replace synthetic business evidence with real pilot evidence if a real operator pilot becomes available.
+- Compare workload/run economics over time across run packages.
+- Complete Total Relevant Customer Cost only when the cost evidence actually exists.

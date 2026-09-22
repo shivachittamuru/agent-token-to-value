@@ -20,12 +20,19 @@ It cannot show real customer conversion, real incremental orders, or realized RO
 
 ## Run
 
+Regression — the fixed technical benchmark:
+
 ```bash
-uv run pytest -q
 uv run scripts/run_evaluation.py
 ```
 
-## Dashboard
+Simulation — demonstrates how business/causal evidence flows without pretending it is production evidence:
+
+```bash
+uv run scripts/run_simulation.py --seed 42 --outcome-seed 4201 --count 20
+```
+
+Dashboard:
 
 ```bash
 uv run streamlit run apps/value_to_action_dashboard.py

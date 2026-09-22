@@ -113,7 +113,35 @@ Observed order               ≠ incremental order
 Unknown                      ≠ zero or failure
 ```
 
-A future simulation mode can make the evidence pipeline dynamic for teaching and dashboarding, but synthetic outcomes must remain explicitly labeled **simulated**.
+Simulation mode makes the evidence pipeline dynamic for teaching and dashboarding. Synthetic outcomes are always explicitly labeled **simulated** and never treated as production evidence.
+
+## Two evidence modes
+
+Both modes use **real** agent execution and **real** technical evaluation. They differ only in the downstream business evidence.
+
+```text
+REGRESSION
+  fixed benchmark
++ real AI execution / evaluation
++ downstream business evidence Unknown
+
+SIMULATION
+  seeded synthetic inquiries
++ real AI execution / evaluation
++ synthetic treatment / control
++ synthetic business outcomes / economics
++ explicit simulation provenance
+```
+
+> Simulation evidence can **establish a claim within simulation scope**. It never satisfies a production evidence requirement — real business outcomes, production incrementality, and complete customer cost stay Unknown, so the action stays **PROVE**.
+
+## Dashboard
+
+```bash
+uv run streamlit run apps/value_to_action_dashboard.py
+```
+
+The dashboard presents a run through **MEASURE → PROVE → VALUE → TEST → DECIDE → ACT**.
 
 ## Where to go next
 

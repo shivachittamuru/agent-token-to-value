@@ -1,20 +1,32 @@
 # Project Versions and Development Branches
 
-This repository preserves the original Token-to-Value implementation while extending it into the Value-to-Action methodology.
+The repository grows in layers: **Agent Quality → Token-to-Value → Value-to-Action**. Each checkpoint preserves the previous one rather than replacing it.
 
-## Stable Token-to-Value Snapshot
+## `token-to-value-v1`
 
-**Tag:** `token-to-value-v1`
-
-This tag marks the stable implementation before Value-to-Action changes began. It preserves the original:
+The original Token-to-Value implementation:
 
 - Foundry Prompt Agent evaluation flow
-- token-cost and token-effectiveness calculations
+- token-cost and token-effectiveness economics
 - business-economics model
-- Streamlit tokenomics dashboard
+- original Streamlit tokenomics dashboard ([apps/dashboard.py](../apps/dashboard.py))
 - reports, tests, and CI evaluation workflow
-
-Use this snapshot when demonstrating or comparing the original Token-to-Value idea.
 
 ```bash
 git checkout token-to-value-v1
+```
+
+## `value-to-action-v1`
+
+The tag intended after `feature/value-to-action` is merged to main. It extends — does not redefine — Token-to-Value with:
+
+- Accepted Work (task success + mandatory guardrails)
+- run-centric evidence package (`runs/<run_id>/`)
+- the Value-to-Action methodology (MEASURE → PROVE → VALUE → TEST → DECIDE → ACT)
+- simulation mode with explicit synthetic provenance
+- synthetic experiment and synthetic population economics
+- the Value-to-Action dashboard ([apps/value_to_action_dashboard.py](../apps/value_to_action_dashboard.py))
+
+## Next branch
+
+The next intended development branch is **`feature/finops-cost-integration`**. It will extend technical/runtime **cost coverage** (broader Azure runtime cost evidence) rather than redefine the Value-to-Action methodology. It is not yet implemented.
