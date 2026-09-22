@@ -33,6 +33,10 @@ from foundry_prompt_agent.synthetic_inquiries import (  # noqa: E402
     generate_inquiries,
     load_menu,
 )
+from foundry_prompt_agent.synthetic_outcomes import (  # noqa: E402
+    build_simulation_metadata,
+    simulate_pilot_outcomes,
+)
 
 MENU_PATH = Path("data/contoso.json")
 
@@ -40,6 +44,7 @@ MENU_PATH = Path("data/contoso.json")
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a synthetic workload simulation.")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--outcome-seed", type=int, default=4201)
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--menu", type=Path, default=MENU_PATH)
     return parser.parse_args()
@@ -83,12 +88,24 @@ def main() -> None:
     print(f"Final status: {run.status}")
     print(f"Foundry report: {run.report_url}")
 
-    # 4. Shared evidence pipeline, tagged as a simulation run.
-    simulation_metadata = {
-        "seed": args.seed,
-        "count": args.count,
-        "generator_version": GENERATOR_VERSION,
-    }
+    # 4. Shared evidence pipeline, tagged as a simulation run. Synthetic pilot
+    # assignment and outcomes are generated from acceptance-joined records.
+    simulation_metadata = build_simulation_metadata(
+        inquiry_seed=args.seed,
+        outcome_seed=args.outcome_seed,
+        count=args.count,
+        generator_version=GENERATOR_VERSION,
+    )
+
+    def pilot_simulator(execution_records: list[dict]):
+        return simulate_pilot_outcomes(
+            interaction_records=execution_records,
+            seed=args.outcome_seed,
+            config=None,
+        )
+
+    print(f"\nOutcome seed: {args.outcome_seed}")
+
     process_completed_run(
         run_id=run_id,
         cases=cases,
@@ -97,6 +114,7 @@ def main() -> None:
         run=run,
         run_mode="simulation",
         simulation_metadata=simulation_metadata,
+        pilot_simulator=pilot_simulator,
     )
 
 

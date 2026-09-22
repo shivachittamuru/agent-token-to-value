@@ -55,6 +55,7 @@ from foundry_prompt_agent.run_artifacts import (
     build_run_summary,
     persist_run_package,
 )
+from foundry_prompt_agent.synthetic_outcomes import summarize_experiment
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -203,6 +204,22 @@ def print_business_outcome_evidence(records: list[dict]) -> None:
         f"Incrementality evidence: "
         f"{'available' if has_incrementality else 'unavailable'}"
     )
+
+
+def print_synthetic_experiment(summary: dict) -> None:
+    print("\n=== Synthetic Business Experiment ===")
+    print(f"Eligible interactions: {summary['eligible_interactions']}")
+    print(f"Treatment: {summary['treatment_count']}")
+    print(f"Control: {summary['control_count']}")
+    print(f"Treatment orders: {summary['treatment_orders']}")
+    print(f"Control orders: {summary['control_orders']}")
+    print(f"Treatment conversion: {summary['treatment_conversion']:.1%}")
+    print(f"Control conversion: {summary['control_conversion']:.1%}")
+    print(
+        f"Simulated conversion lift: "
+        f"{summary['simulated_conversion_lift_pp']:.1f} pp"
+    )
+    print("Evidence: SYNTHETIC SIMULATION")
 
 
 def print_pilot_evidence(records: list[dict]) -> None:
@@ -538,11 +555,14 @@ def process_completed_run(
     run,
     run_mode: str = "regression",
     simulation_metadata: dict | None = None,
+    pilot_simulator=None,
 ) -> None:
     """Run the full evidence pipeline for a completed evaluation and persist it.
 
     Shared by the fixed regression runner and the synthetic workload simulator.
-    Only the tokenomics history append is regression-specific.
+    ``pilot_simulator`` (simulation only) maps acceptance-joined execution
+    records to ``(pilot_events, outcome_events)``. Only the tokenomics history
+    append is regression-specific.
     """
 
     if run.status == "completed":
@@ -580,19 +600,29 @@ def process_completed_run(
         )
         print_execution_economics(execution_economics)
 
-        # 4e. Business Outcome Evidence: no downstream system yet, so all
-        # downstream fields correctly persist as Unknown (None).
+        # 4e/4f. Simulated pilot assignment + synthetic outcomes (simulation
+        # only). Regression keeps pilot/business evidence Unknown.
+        if pilot_simulator is not None:
+            pilot_events, outcome_events = pilot_simulator(execution_records)
+        else:
+            pilot_events, outcome_events = None, None
+
+        # 4e. Business Outcome Evidence.
         business_outcome_records = build_business_outcome_records(
-            execution_records, outcome_events=None
+            execution_records, outcome_events=outcome_events
         )
         print_business_outcome_evidence(business_outcome_records)
 
-        # 4f. Pilot Evidence: no pilot is running, so pilot metadata stays
-        # Unknown (None). Nothing is assigned, simulated, or randomized.
+        # 4f. Pilot Evidence.
         pilot_evidence_records = build_pilot_evidence_records(
-            execution_records, pilot_events=None
+            execution_records, pilot_events=pilot_events
         )
         print_pilot_evidence(pilot_evidence_records)
+
+        if pilot_events is not None:
+            print_synthetic_experiment(
+                summarize_experiment(pilot_events, outcome_events)
+            )
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
