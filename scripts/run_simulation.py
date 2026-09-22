@@ -2,12 +2,19 @@
 
 Run from the repository root, for example:
 
-    uv run scripts/run_simulation.py --seed 42 --count 20
+    uv run scripts/run_simulation.py --seed 42 --outcome-seed 4201 --count 20
 
 Generates reproducible synthetic customer inquiries (no LLM), then sends them
-through the REAL Contoso agent and REAL Foundry evaluation. This produces real
-technical evidence over a *simulated* workload. It is NOT production traffic and
-creates no business outcomes, orders, or treatment/control assignments.
+through the REAL Contoso agent and REAL Foundry evaluation. On top of that real
+technical execution it layers a SYNTHETIC business experiment: randomized
+treatment/control assignment and synthetic customer outcomes (Simulator 1B),
+and propagates that synthetic experiment evidence through Value-to-Action while
+keeping it strictly labeled as simulated (Simulator 1C).
+
+All business, pilot, and causal evidence produced here is synthetic. It is NOT
+production traffic, and synthetic evidence never satisfies a production-evidence
+claim: real business outcomes, production incrementality, and complete customer
+cost remain Unknown, so the selected portfolio action stays PROVE.
 """
 
 import argparse

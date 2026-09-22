@@ -26,6 +26,10 @@ PILOT_FIELDS = (
     "attribution_window_minutes",
     "protocol_deviation",
     "protocol_deviation_reason",
+    # Exposure/simulation provenance (None for real/regression pilots).
+    "exposure",
+    "evidence_mode",
+    "simulated",
 )
 
 

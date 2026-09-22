@@ -205,6 +205,18 @@ def _action_rationale(
 ) -> str:
     if action == "prove":
         scope = workload_assessment.get("technical_evidence_scope", "regression")
+        business_scope = workload_assessment.get(
+            "business_evidence_scope", "regression"
+        )
+        if business_scope == "simulation":
+            return (
+                "The synthetic experiment demonstrates how treatment/control "
+                "evidence would flow through the framework, but real business "
+                "outcomes, production incrementality, and complete customer "
+                "cost are not established. Scale is currently ineligible, so a "
+                "bounded pilot is authorized to reduce the decision-critical "
+                "uncertainty."
+            )
         scope_phrase = (
             "simulated workload"
             if scope == "simulation"

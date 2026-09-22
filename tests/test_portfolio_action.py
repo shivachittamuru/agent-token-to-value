@@ -251,6 +251,23 @@ def test_simulation_action_rationale_has_no_regression_wording():
     assert "simulated workload" in rationale
 
 
+def test_synthetic_evidence_keeps_action_prove():
+    record = build(
+        workload_assessment=assessment(
+            business="observed",
+            incrementality="established",
+            business_evidence_scope="simulation",
+            incrementality_evidence_scope="simulation",
+        )
+    )
+
+    assert record["selected_action"] == "prove"
+    rationale = record["action_rationale"].lower()
+    assert "synthetic experiment" in rationale
+    assert "realized" not in rationale
+    assert "production incrementality" in rationale
+
+
 def test_no_composite_score_field():
     record = build()
     serialized = json.dumps(record).lower()

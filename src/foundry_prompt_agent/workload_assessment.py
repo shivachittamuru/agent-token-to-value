@@ -84,28 +84,44 @@ def build_workload_assessment(
     business_outcome_records: list[dict],
     pilot_evidence_records: list[dict],
     run_mode: str = "regression",
+    synthetic_experiment: dict | None = None,
 ) -> dict:
     """Synthesize existing evidence records into a structured assessment.
 
-    Each dimension preserves its source record's evidence state. No economics
-    are recalculated and no portfolio action is selected. ``run_mode`` sets the
-    technical evidence scope (regression vs. simulation) without changing the
-    technical evidence status.
+    Each dimension preserves its source record's evidence state and keeps
+    evidence STATUS separate from evidence SCOPE. Synthetic simulation evidence
+    can establish a status within its scope, but never removes the real-world
+    (production) decision gaps. No economics are recalculated and no portfolio
+    action is selected.
     """
+
+    is_simulation = run_mode == "simulation"
+    has_synthetic_experiment = synthetic_experiment is not None
 
     technical_performance_status = _technical_performance_status(
         business_outcome_records
     )
     technical_evidence_scope = (
         TECHNICAL_SCOPE_SIMULATION
-        if run_mode == "simulation"
+        if is_simulation
         else TECHNICAL_SCOPE_REGRESSION
     )
     execution_cost_status = execution_economics["cost_completeness"]
+
     business_outcome_status = _business_outcome_status(business_outcome_records)
-    incrementality_status = _incrementality_status(
-        business_outcome_records, pilot_evidence_records
-    )
+    business_evidence_scope = "simulation" if is_simulation else "regression"
+
+    if has_synthetic_experiment:
+        # Population-level randomized synthetic control establishes causal
+        # evidence within the simulation only.
+        incrementality_status = INCREMENTALITY_ESTABLISHED
+        incrementality_evidence_scope = "simulation"
+    else:
+        incrementality_status = _incrementality_status(
+            business_outcome_records, pilot_evidence_records
+        )
+        incrementality_evidence_scope = "regression"
+
     economic_value_status = economic_value["value_evidence_status"]
     incremental_economics_status = incremental_economics["economics_status"]
     resilience_scope = value_resilience["resilience_scope"]
@@ -125,6 +141,17 @@ def build_workload_assessment(
         "Model inference cost measured directly from token usage"
     )
 
+    # Simulated claims are explicit about their synthetic provenance.
+    simulated_claims = []
+    if is_simulation and business_outcome_status == BUSINESS_OUTCOME_OBSERVED:
+        simulated_claims.append(
+            "Business outcomes observed in synthetic simulation"
+        )
+    if has_synthetic_experiment:
+        simulated_claims.append(
+            "Incremental conversion established within synthetic experiment"
+        )
+
     modeled_claims = []
     if economic_value_status == "modeled_only":
         modeled_claims.append(
@@ -136,21 +163,21 @@ def build_workload_assessment(
             "Value resilience assessed on modeled scenarios only"
         )
 
-    unknown_claims = []
-    if business_outcome_status == BUSINESS_OUTCOME_UNKNOWN:
-        unknown_claims.append("Downstream business outcomes not observed")
-    if incrementality_status == INCREMENTALITY_UNKNOWN:
-        unknown_claims.append("Causal/incremental conversion not established")
+    # Real-world (production) claims remain Unknown regardless of synthetic
+    # evidence, until a production-scope evidence source exists.
+    unknown_claims = [
+        "Real-world business outcomes not observed",
+        "Production incremental (causal) conversion not established",
+    ]
     if incremental_economics_status != "incremental_net_value_established":
         unknown_claims.append("Next-dollar (incremental) economics not established")
     if execution_cost_status != "complete":
         unknown_claims.append("Total relevant customer cost incomplete")
 
-    decision_gaps = []
-    if business_outcome_status == BUSINESS_OUTCOME_UNKNOWN:
-        decision_gaps.append("real eligible-demand baseline")
-        decision_gaps.append("real business outcomes")
-    if incrementality_status == INCREMENTALITY_UNKNOWN:
+    # Decision gaps track real-world evidence; synthetic evidence never removes
+    # them because its scope is not production.
+    decision_gaps = ["real eligible-demand baseline", "real business outcomes"]
+    if incrementality_evidence_scope != "production":
         decision_gaps.append("causal/incremental conversion")
     if execution_cost_status != "complete":
         decision_gaps.append("Total Relevant Customer Cost")
@@ -159,11 +186,11 @@ def build_workload_assessment(
     if resilience_scope == "modeled_scenario":
         decision_gaps.append("capacity step-functions")
 
-    next_evidence_priorities = []
-    if business_outcome_status == BUSINESS_OUTCOME_UNKNOWN:
-        next_evidence_priorities.append("actual eligible-demand baseline")
-        next_evidence_priorities.append("observed order economics")
-    if incrementality_status == INCREMENTALITY_UNKNOWN:
+    next_evidence_priorities = [
+        "actual eligible-demand baseline",
+        "observed order economics",
+    ]
+    if incrementality_evidence_scope != "production":
         next_evidence_priorities.append("treatment/control conversion")
     if execution_cost_status != "complete":
         next_evidence_priorities.append("Total Relevant Customer Cost")
@@ -180,12 +207,15 @@ def build_workload_assessment(
         "technical_evidence_scope": technical_evidence_scope,
         "execution_cost_status": execution_cost_status,
         "business_outcome_status": business_outcome_status,
+        "business_evidence_scope": business_evidence_scope,
         "incrementality_status": incrementality_status,
+        "incrementality_evidence_scope": incrementality_evidence_scope,
         "economic_value_status": economic_value_status,
         "incremental_economics_status": incremental_economics_status,
         "resilience_scope": resilience_scope,
         "resilience_status": resilience_status,
         "established_claims": established_claims,
+        "simulated_claims": simulated_claims,
         "modeled_claims": modeled_claims,
         "unknown_claims": unknown_claims,
         "decision_gaps": decision_gaps,

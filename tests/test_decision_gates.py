@@ -186,3 +186,35 @@ def test_simulation_evidence_gate_rationale_has_no_regression_wording():
     rationale = record["gates"]["evidence_gate"]["rationale"].lower()
     assert "regression" not in rationale
     assert "simulation" in rationale
+
+
+def test_synthetic_evidence_does_not_make_scale_eligible():
+    # Synthetic observed business + established (simulation) incrementality.
+    record = build(
+        workload_assessment=workload_assessment(
+            business="observed",
+            incrementality="established",
+        )
+        | {
+            "business_evidence_scope": "simulation",
+            "incrementality_evidence_scope": "simulation",
+        }
+    )
+
+    assert record["gates"]["evidence_gate"]["status"] == "conditional"
+    assert "scale" not in record["eligible_actions"]
+    assert "synthetic" in record["gates"]["evidence_gate"]["rationale"].lower()
+
+
+def test_synthetic_evidence_gate_uses_no_production_wording():
+    record = build(
+        workload_assessment=workload_assessment(business="observed")
+        | {
+            "business_evidence_scope": "simulation",
+            "incrementality_evidence_scope": "simulation",
+        }
+    )
+    rationale = record["gates"]["evidence_gate"]["rationale"].lower()
+
+    assert "realized" not in rationale
+    assert "production incrementality" in rationale

@@ -167,3 +167,26 @@ def test_batch_without_events_persists_all_unknown():
 
     assert all(r["assignment"] is None for r in joined)
     assert all(r["pilot_id"] is None for r in joined)
+
+
+def test_exposure_provenance_survives_builder():
+    event = pilot_event(
+        assignment="treatment",
+        exposure="ai_exposed_to_simulated_customer",
+        evidence_mode="synthetic_simulation",
+        simulated=True,
+    )
+
+    record = build_pilot_evidence_record("alpha", event)
+
+    assert record["exposure"] == "ai_exposed_to_simulated_customer"
+    assert record["evidence_mode"] == "synthetic_simulation"
+    assert record["simulated"] is True
+
+
+def test_exposure_fields_default_none_without_event():
+    record = build_pilot_evidence_record("alpha")
+
+    assert record["exposure"] is None
+    assert record["evidence_mode"] is None
+    assert record["simulated"] is None

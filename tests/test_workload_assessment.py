@@ -206,3 +206,99 @@ def test_assessment_status_is_neutral():
     record = build()
 
     assert record["assessment_status"] == ASSESSMENT_INCOMPLETE
+
+
+def _simulation_business_records() -> list[dict]:
+    downstream = {
+        "customer_engaged_after_response": True,
+        "order_completed": True,
+        "order_id": "sim-order-i0",
+        "order_value_usd": 8.0,
+        "incremental_order": None,
+        "counterfactual_method": "randomized_synthetic_control",
+        "outcome_evidence_source": "synthetic_simulation",
+        "outcome_observed_at_utc": "2026-01-01T00:10:00+00:00",
+    }
+    return [
+        {"interaction_id": f"i{n}", "accepted": True, **downstream}
+        for n in range(3)
+    ]
+
+
+def _simulation_pilot_records() -> list[dict]:
+    return [
+        {
+            "interaction_id": f"i{n}",
+            "assignment": "treatment" if n % 2 == 0 else "control",
+            "exposure": "ai_exposed_to_simulated_customer",
+            "evidence_mode": "synthetic_simulation",
+            "simulated": True,
+        }
+        for n in range(3)
+    ]
+
+
+def simulation_assessment(**overrides) -> dict:
+    kwargs = {
+        "workload_id": "contoso-demand-recovery",
+        "execution_economics": execution_economics(),
+        "economic_value": economic_value(),
+        "incremental_economics": incremental_economics(),
+        "value_resilience": value_resilience(),
+        "business_outcome_records": _simulation_business_records(),
+        "pilot_evidence_records": _simulation_pilot_records(),
+        "run_mode": "simulation",
+        "synthetic_experiment": {"treatment_count": 2, "control_count": 1},
+    }
+    kwargs.update(overrides)
+    return build_workload_assessment(**kwargs)
+
+
+def test_simulation_business_status_observed_scope_simulation():
+    record = simulation_assessment()
+
+    assert record["business_outcome_status"] == "observed"
+    assert record["business_evidence_scope"] == "simulation"
+
+
+def test_simulation_incrementality_established_scope_simulation():
+    record = simulation_assessment()
+
+    assert record["incrementality_status"] == "established"
+    assert record["incrementality_evidence_scope"] == "simulation"
+
+
+def test_simulation_keeps_real_world_decision_gaps():
+    record = simulation_assessment()
+
+    assert "real business outcomes" in record["decision_gaps"]
+    assert "causal/incremental conversion" in record["decision_gaps"]
+
+
+def test_simulation_claims_are_explicitly_synthetic():
+    record = simulation_assessment()
+
+    assert any(
+        "synthetic simulation" in claim.lower()
+        for claim in record["simulated_claims"]
+    )
+    assert any(
+        "synthetic experiment" in claim.lower()
+        for claim in record["simulated_claims"]
+    )
+
+
+def test_simulation_unknown_claims_keep_real_world_gaps():
+    record = simulation_assessment()
+
+    joined = " ".join(record["unknown_claims"]).lower()
+    assert "real-world business outcomes not observed" in joined
+    assert "production incremental" in joined
+
+
+def test_simulation_assessment_uses_no_production_wording():
+    record = simulation_assessment()
+
+    for claim in record["simulated_claims"]:
+        assert "production" not in claim.lower()
+        assert "realized" not in claim.lower()

@@ -171,6 +171,8 @@ def build_run_summary(
     run_mode: str = "regression",
     evidence_mode: str = "measured_regression",
     simulation: dict | None = None,
+    synthetic_experiment: dict | None = None,
+    synthetic_economics: dict | None = None,
 ) -> dict:
     """Assemble the run-level summary, preserving each section's exact values."""
 
@@ -180,6 +182,10 @@ def build_run_summary(
         "run_mode": run_mode,
         "evidence_mode": evidence_mode,
         "simulation": simulation,
+        # Simulation-only sections; null/absent for regression runs. Passed
+        # through verbatim — never recalculated here.
+        "synthetic_experiment": synthetic_experiment,
+        "synthetic_economics": synthetic_economics,
         "execution_economics": execution_economics,
         "modeled_business_economics": modeled_business_economics,
         "economic_value": economic_value,

@@ -56,6 +56,9 @@ from foundry_prompt_agent.run_artifacts import (
     persist_run_package,
 )
 from foundry_prompt_agent.synthetic_outcomes import summarize_experiment
+from foundry_prompt_agent.synthetic_economics import (
+    build_synthetic_economics_record,
+)
 from foundry_prompt_agent.foundry_eval import (
     BEHAVIOR_CRITERION,
     collect_accepted_work,
@@ -619,13 +622,30 @@ def process_completed_run(
         )
         print_pilot_evidence(pilot_evidence_records)
 
+        experiment_summary = None
         if pilot_events is not None:
-            print_synthetic_experiment(
-                summarize_experiment(pilot_events, outcome_events)
-            )
+            experiment_summary = summarize_experiment(pilot_events, outcome_events)
+            print_synthetic_experiment(experiment_summary)
 
         # 5. Load transparent business assumptions.
         assumptions = load_business_assumptions(ASSUMPTIONS_PATH)
+
+        # 5b. Synthetic population economics (simulation only). Kept entirely
+        # separate from the production-oriented economic_value contract.
+        synthetic_economics_record = None
+        synthetic_experiment_section = None
+        if experiment_summary is not None:
+            synthetic_economics_record = build_synthetic_economics_record(
+                experiment_summary=experiment_summary,
+                outcome_events=outcome_events,
+                contribution_margin=assumptions["contribution_margin"],
+                economic_basis_id=f"synthetic-{run_id}",
+            )
+            synthetic_experiment_section = {
+                **experiment_summary,
+                "evidence_mode": "synthetic_simulation",
+                "counterfactual_method": "randomized_synthetic_control",
+            }
 
         # 6. Combine measured AI performance with business assumptions.
         business_economics = summarize_business_economics(
@@ -704,6 +724,7 @@ def process_completed_run(
             business_outcome_records=business_outcome_records,
             pilot_evidence_records=pilot_evidence_records,
             run_mode=run_mode,
+            synthetic_experiment=experiment_summary,
         )
         print_workload_assessment(workload_assessment)
 
@@ -769,6 +790,8 @@ def process_completed_run(
                 else "measured_regression"
             ),
             simulation=simulation_metadata,
+            synthetic_experiment=synthetic_experiment_section,
+            synthetic_economics=synthetic_economics_record,
         )
         interactions_path, summary_path = persist_run_package(
             run_id, interaction_records, run_summary

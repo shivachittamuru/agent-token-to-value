@@ -67,14 +67,32 @@ def _evidence_gate(workload_assessment: dict) -> dict:
     technical = workload_assessment["technical_performance_status"]
     scope = workload_assessment.get("technical_evidence_scope", "regression")
     business = workload_assessment["business_outcome_status"]
+    business_scope = workload_assessment.get("business_evidence_scope", "regression")
     incrementality = workload_assessment["incrementality_status"]
+    incrementality_scope = workload_assessment.get(
+        "incrementality_evidence_scope", "regression"
+    )
 
+    # PASS requires production-scope business and causal evidence. Synthetic
+    # simulation evidence demonstrates the flow but never satisfies it.
     if (
         technical == "established"
         and business == "observed"
+        and business_scope == "production"
         and incrementality == "established"
+        and incrementality_scope == "production"
     ):
         return _gate(GATE_PASS, "Technical, business, and causal evidence established.")
+
+    if business_scope == "simulation" or incrementality_scope == "simulation":
+        return _gate(
+            GATE_CONDITIONAL,
+            "The synthetic experiment demonstrates how treatment/control "
+            "evidence would flow through the framework, but real business "
+            "outcomes, production incrementality, and complete customer cost "
+            "are not established.",
+        )
+
     if business == "unknown" or incrementality == "unknown":
         return _gate(
             GATE_CONDITIONAL,

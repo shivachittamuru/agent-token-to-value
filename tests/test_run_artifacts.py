@@ -112,6 +112,32 @@ def test_pilot_unknowns_remain_null():
     assert "interaction_id" not in record["pilot"]
 
 
+def test_pilot_exposure_survives_into_interaction():
+    exposed_pilot = {
+        **pilot_evidence_record("alpha"),
+        "assignment": "treatment",
+        "exposure": "ai_exposed_to_simulated_customer",
+        "evidence_mode": "synthetic_simulation",
+        "simulated": True,
+    }
+
+    records = build_interaction_records(
+        run_id="run1",
+        workload_id="w",
+        cases=[case(name="alpha")],
+        execution_records=[execution_record("alpha")],
+        business_outcome_records=[business_outcome_record("alpha")],
+        pilot_evidence_records=[exposed_pilot],
+        run_mode="simulation",
+    )
+
+    pilot = records[0]["pilot"]
+    assert pilot["exposure"] == "ai_exposed_to_simulated_customer"
+    assert pilot["evidence_mode"] == "synthetic_simulation"
+    assert pilot["simulated"] is True
+    assert records[0]["run_mode"] == "simulation"
+
+
 def test_business_outcome_unknowns_remain_null():
     record = build()[0]
 
@@ -257,6 +283,35 @@ def test_summary_evidence_mode_is_explicit():
     assert simulation["run_mode"] == "simulation"
     assert simulation["evidence_mode"] == "synthetic_simulation"
     assert simulation["simulation"]["seed"] == 42
+
+
+def test_synthetic_sections_pass_through_and_default_null():
+    regression = summary_sections()
+    experiment = {"treatment_count": 16, "control_count": 4, "evidence": "x"}
+    economics = {"economic_basis_id": "synthetic-run1"}
+    simulation = build_run_summary(
+        run_id="run2",
+        workload_id="w",
+        execution_economics={},
+        modeled_business_economics={},
+        economic_value={},
+        incremental_economics={},
+        value_resilience={},
+        workload_assessment={},
+        decision_gates={},
+        portfolio_action={},
+        run_mode="simulation",
+        evidence_mode="synthetic_simulation",
+        synthetic_experiment=experiment,
+        synthetic_economics=economics,
+    )
+
+    # Regression defaults both synthetic sections to null.
+    assert regression["synthetic_experiment"] is None
+    assert regression["synthetic_economics"] is None
+    # Simulation passes them through verbatim (not recalculated).
+    assert simulation["synthetic_experiment"] == experiment
+    assert simulation["synthetic_economics"] == economics
 
 
 def test_persistence_layer_does_not_recalculate_economics():
