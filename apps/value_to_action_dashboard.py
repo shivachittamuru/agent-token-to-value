@@ -95,6 +95,7 @@ def _render_header(meta: dict, simulation: bool) -> None:
             "**REGRESSION EVIDENCE** — Real AI execution/evaluation over the "
             "fixed regression suite. No downstream business evidence."
         )
+    st.divider()
 
 
 def _render_journey(summary: dict) -> None:
@@ -103,6 +104,7 @@ def _render_journey(summary: dict) -> None:
     columns = st.columns(len(views.JOURNEY_STAGES))
     for column, stage in zip(columns, views.JOURNEY_STAGES):
         column.metric(stage, states[stage])
+    st.divider()
 
 
 def _render_measure(summary: dict, interactions: list[dict]) -> None:
@@ -131,6 +133,7 @@ def _render_measure(summary: dict, interactions: list[dict]) -> None:
         "Full Execution Cost or Total Relevant Customer Cost — those remain "
         "incomplete."
     )
+    st.divider()
 
 
 def _render_prove(summary: dict, simulation: bool) -> None:
@@ -142,8 +145,8 @@ def _render_prove(summary: dict, simulation: bool) -> None:
             "Downstream business and counterfactual evidence are **Unknown** "
             "for this run. No treatment/control experiment is present."
         )
+        st.divider()
         return
-
     row = st.columns(4)
     row[0].metric("Eligible", experiment.get("eligible_interactions", "—"))
     row[1].metric("Treatment", experiment.get("treatment_count", "—"))
@@ -172,6 +175,7 @@ def _render_prove(summary: dict, simulation: bool) -> None:
     )
     st.plotly_chart(figure, use_container_width=True)
     st.caption("Evidence: **SYNTHETIC SIMULATION** — this is a simulated lift, not realized or production lift.")
+    st.divider()
 
 
 def _render_value(summary: dict) -> None:
@@ -233,6 +237,7 @@ def _render_value(summary: dict) -> None:
         "Incremental Net Economic Value",
         _money(incremental) if incremental is not None else "NOT ESTABLISHED",
     )
+    st.divider()
 
 
 def _render_test(summary: dict) -> None:
@@ -253,6 +258,7 @@ def _render_test(summary: dict) -> None:
         with st.expander(f"{label} ({len(items)})"):
             for item in items:
                 st.markdown(f"- {item}")
+    st.divider()
 
 
 def _render_decide(summary: dict) -> None:
@@ -272,6 +278,7 @@ def _render_decide(summary: dict) -> None:
 
     if not actions["scale_eligible"]:
         st.warning("SCALE is currently **ineligible**.")
+    st.divider()
 
 
 def _render_act(summary: dict) -> None:
@@ -297,6 +304,7 @@ def _render_act(summary: dict) -> None:
         st.caption(f"Resource request: {act['resource_request']}")
     if act["reassessment_trigger"]:
         st.caption(f"Reassessment trigger: {act['reassessment_trigger']}")
+    st.divider()
 
 
 def _render_explorer(interactions: list[dict]) -> None:
