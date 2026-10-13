@@ -176,22 +176,110 @@ def test_returned_zero_is_observed(config, billing_page):
 
 
 def test_missing_resource_stays_missing_and_allocator_refuses_total(config, billing_page):
-    billing_page["properties"]["rows"].pop()
+    billing_page["properties"]["rows"].pop(2)
     evidence = fetch(config, [billing_page])
-    missing = evidence["resources"][3]
+    missing = evidence["resources"][2]
     assert missing["actual_cost_usd"] is None
     assert missing["cost_evidence_status"] == "not_returned"
+    assert missing["billing_expectation"] == "direct_charge_expected"
     combined = build_azure_runtime_cost_config(
         allocation_config=config, cost_evidence=evidence
     )
-    assert combined["resources"][3]["actual_cost_usd"] is None
+    assert combined["resources"][2]["actual_cost_usd"] is None
     with pytest.raises(ValueError, match="missing billing evidence.*not_returned"):
         summarize_azure_runtime_cost(combined)
 
 
 def test_empty_response_is_not_observed_zero(config):
     evidence = fetch(config, [page([])])
-    assert all(resource["cost_evidence_status"] == "not_returned" for resource in evidence["resources"])
+    assert all(resource["cost_evidence_status"] == "not_returned" for resource in evidence["resources"][:3])
+    assert evidence["resources"][3]["cost_evidence_status"] == "no_direct_charge_returned"
+    with pytest.raises(ValueError, match="missing billing evidence"):
+        summarize_azure_runtime_cost(build_azure_runtime_cost_config(
+            allocation_config=config, cost_evidence=evidence
+        ))
+
+
+def test_live_style_september_without_appinsights_can_allocate(config, billing_page):
+    billing_page["properties"]["rows"].pop()
+    billing_page["properties"]["rows"][1][0] = 4.123483
+    billing_page["properties"]["rows"][2][0] = 0.018399
+    evidence = fetch(config, [billing_page])
+    appinsights = evidence["resources"][3]
+    assert appinsights["billing_expectation"] == "may_be_billed_elsewhere"
+    assert appinsights["actual_cost_usd"] == 0
+    assert appinsights["cost_evidence_status"] == "no_direct_charge_returned"
+    summary = summarize_azure_runtime_cost(build_azure_runtime_cost_config(
+        allocation_config=config, cost_evidence=evidence
+    ))
+    assert summary["actual_selected_resource_cost_usd"] == pytest.approx(246.061882)
+    assert summary["allocated_azure_runtime_cost_usd"] == pytest.approx(52.525882)
+    assert summary["allocation_status"] == "partially_allocated"
+    allocation = summary["resource_allocations"][3]
+    assert allocation["allocated_cost_usd"] == 0
+    assert allocation["billing_expectation"] == "may_be_billed_elsewhere"
+    assert allocation["cost_evidence_status"] == "no_direct_charge_returned"
+    assert allocation["cost_evidence_status"] != "observed_billing"
+
+
+@pytest.mark.parametrize("explicit_missing", [False, True])
+def test_api_attachment_applies_billing_expectation(config, billing_page, explicit_missing):
+    evidence = fetch(config, [billing_page])
+    if explicit_missing:
+        evidence["resources"][3]["actual_cost_usd"] = None
+        evidence["resources"][3]["cost_evidence_status"] = "not_returned"
+    else:
+        evidence["resources"].pop()
+    before = deepcopy(evidence)
+    combined = build_azure_runtime_cost_config(allocation_config=config, cost_evidence=evidence)
+    assert evidence == before
+    assert combined["resources"][3]["actual_cost_usd"] == 0
+    assert combined["resources"][3]["cost_evidence_status"] == "no_direct_charge_returned"
+    assert summarize_azure_runtime_cost(combined)["allocated_azure_runtime_cost_usd"] == pytest.approx(52.524)
+
+
+@pytest.mark.parametrize("expectation", ["unknown", None])
+def test_unknown_billing_expectation_rejected_before_azure(config, expectation):
+    config["resources"][0]["billing_expectation"] = expectation
+    with pytest.raises(ValueError, match="billing_expectation"):
+        costs.fetch_azure_resource_costs(
+            allocation_config=config, start=START, end=END, today=TODAY
+        )
+
+
+def test_missing_billing_expectation_rejected_before_azure(config):
+    del config["resources"][3]["billing_expectation"]
+    with pytest.raises(ValueError, match="missing required field: billing_expectation"):
+        costs.fetch_azure_resource_costs(
+            allocation_config=config, start=START, end=END, today=TODAY
+        )
+
+
+@pytest.mark.parametrize("problem", ["direct_resource", "nonzero", "expectation_mismatch"])
+def test_invalid_no_direct_charge_evidence_rejected(config, billing_page, problem):
+    evidence = fetch(config, [billing_page])
+    index = 0 if problem == "direct_resource" else 3
+    observation = evidence["resources"][index]
+    observation["cost_evidence_status"] = "no_direct_charge_returned"
+    observation["actual_cost_usd"] = 1 if problem == "nonzero" else 0
+    if problem == "expectation_mismatch":
+        observation["billing_expectation"] = "direct_charge_expected"
+    with pytest.raises(ValueError):
+        build_azure_runtime_cost_config(allocation_config=config, cost_evidence=evidence)
+
+
+def test_manual_appinsights_evidence_is_preserved():
+    manual = load_azure_runtime_cost_config(CONFIG_PATH)
+    appinsights = manual["resources"][3]
+    assert appinsights["actual_cost_usd"] == 0
+    assert appinsights.get("cost_evidence_status", "observed_billing") == "observed_billing"
+    assert appinsights["note"] == (
+        "No direct September cost line item. Telemetry cost may be attributed "
+        "through the linked Log Analytics workspace."
+    )
+    summary = summarize_azure_runtime_cost(manual)
+    assert summary["actual_selected_resource_cost_usd"] == pytest.approx(246.06)
+    assert summary["allocated_azure_runtime_cost_usd"] == pytest.approx(52.524)
 
 
 def test_resource_ids_match_case_insensitively(config, billing_page):
@@ -432,7 +520,7 @@ def test_rest_adapter_surfaces_azure_error_and_closes_response(monkeypatch, conf
     assert responses[0].closed
 
 
-@pytest.mark.parametrize("missing", [False, True])
+@pytest.mark.parametrize("missing", [None, "direct", "elsewhere"])
 def test_cli_prints_costs_without_writing_fixture(monkeypatch, capsys, config, billing_page, missing):
     spec = importlib.util.spec_from_file_location(
         "fetch_cost_cli", ROOT / "scripts" / "fetch_azure_runtime_cost.py"
@@ -440,19 +528,22 @@ def test_cli_prints_costs_without_writing_fixture(monkeypatch, capsys, config, b
     assert spec is not None and spec.loader is not None
     cli = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cli)
-    if missing:
-        billing_page["properties"]["rows"].pop()
+    if missing is not None:
+        billing_page["properties"]["rows"].pop(2 if missing == "direct" else 3)
     evidence = fetch(config, [billing_page])
     monkeypatch.setattr(cli, "fetch_azure_resource_costs", lambda **kwargs: evidence)
     monkeypatch.setattr(sys, "argv", ["fetch_cost_cli", "--month", "2026-09"])
     before = CONFIG_PATH.read_bytes()
-    assert cli.main() == (1 if missing else 0)
+    assert cli.main() == (1 if missing == "direct" else 0)
     output = capsys.readouterr()
     assert CONFIG_PATH.read_bytes() == before
-    if missing:
+    if missing == "direct":
         assert "not_returned (not observed zero)" in output.out
         assert "missing billing evidence" in output.err
         assert "Raw selected-resource total" not in output.out
     else:
         assert "Raw selected-resource total: 246.060000 USD" in output.out
         assert "Allocated Azure runtime cost: 52.524000 USD" in output.out
+        assert not output.err
+        if missing == "elsewhere":
+            assert "0.000000 USD [no_direct_charge_returned; charges may be billed elsewhere]" in output.out

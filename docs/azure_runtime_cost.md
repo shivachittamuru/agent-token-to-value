@@ -53,6 +53,9 @@ Missing fields, duplicate resource names, unsupported methods, invalid dates,
 and non-USD currencies fail with `ValueError`. Periods include both endpoints.
 Summary dates are ISO strings; raw YAML dates may be Python `date` values.
 
+Each resource requires `billing_expectation`, either `direct_charge_expected`
+or `may_be_billed_elsewhere`; unknown or missing values fail validation.
+
 `load_azure_runtime_cost_config` still selects the September manual fixture.
 For automated ingestion, use `load_azure_runtime_allocation_config`, then
 `build_azure_runtime_cost_config` to attach new evidence to those same rules.
@@ -96,12 +99,27 @@ case-insensitive, unrelated rows are ignored, and duplicate resource totals
 within or across pages fail rather than risk double-counting.
 
 Returned zero-cost rows have `actual_cost_usd: 0` and
-`cost_evidence_status: observed_billing`. An absent resource has
-`actual_cost_usd: null` and `cost_evidence_status: not_returned`.
-Absence does not establish zero billing. The allocator rejects incomplete
-evidence, so neither a complete workload total nor runtime economics is
-manufactured from it. In particular, an absent Application Insights row
-cannot inherit the manually validated September zero.
+`cost_evidence_status: observed_billing`, regardless of billing expectation.
+Absent resources are handled according to their configured expectation:
+
+* `direct_charge_expected`: Search, Foundry/model runtime, and Log Analytics
+  remain `not_returned` with `actual_cost_usd: null`. Missing required direct
+  charges prevent the allocator from producing a runtime-cost total.
+* `may_be_billed_elsewhere`: Application Insights receives
+  `actual_cost_usd: 0` and `cost_evidence_status: no_direct_charge_returned`.
+  The allocator may continue, and the distinct status survives in its output.
+
+`no_direct_charge_returned` means no direct charge was returned in this
+billing query. It is not an observed zero billing row and does not mean the
+resource has no economic cost anywhere. Its telemetry charges may be
+attributed through Log Analytics. The status requires a configured
+`may_be_billed_elsewhere` expectation and zero direct charge; it cannot be
+used to bypass missing direct charges or hide a positive returned charge.
+
+The attachment path uses the same absence rules for API evidence. It does
+not infer an API-query absence from an omitted manual evidence entry, and it
+never falls back to a manual amount. The preserved September manual
+Application Insights zero and explanatory note are unchanged.
 
 ### Read-only live validation
 
@@ -123,14 +141,19 @@ uv run python scripts\fetch_azure_runtime_cost.py --month 2026-09
 [fetch_azure_runtime_cost.py](../scripts/fetch_azure_runtime_cost.py) prints
 each resource's evidence, then uses the existing allocator to print raw and
 allocated totals. It writes no files and never updates the manual fixture or
-run artifacts. Missing evidence is printed explicitly and produces a nonzero
-exit status rather than a success-shaped total.
+run artifacts. Missing required direct charges are printed explicitly and
+produce a nonzero exit status rather than a success-shaped total. An absent
+Application Insights direct charge is printed with
+`no_direct_charge_returned` and a warning that charges may be billed elsewhere.
 
 September validation expectations are $246.06 raw selected-resource cost and
 $52.524 allocated runtime cost. These remain regression expectations, not
-production constants. If Azure omits the zero-cost Application Insights row,
-compare the three returned charges with manual evidence, but do not claim a
-complete automated allocation until missing evidence is resolved.
+production constants. With Application Insights absent, the September
+live-style fixture uses $241.92 Search, $4.123483 Foundry/model runtime,
+and $0.018399 Log Analytics. It produces approximately $246.061882 in selected
+direct charges and $52.525882 allocated runtime cost, using the same 20%
+Search allocation. This remains partially allocated technical runtime cost,
+not complete customer cost.
 
 ### September live validation result
 
@@ -140,11 +163,13 @@ approximately $0.018399. These resource amounts match the manual fixture when
 rounded to cents. Their observed-row subtotal is approximately $246.061882,
 not a complete allow-list total.
 
-Azure did not return Application Insights. Its evidence remained
-`not_returned`, and the CLI exited with status 1 without producing an allocated
-workload total. The automated $52.524 baseline therefore was not fully
-validated live. The preserved manual path and complete fake-response tests
-still reproduce $246.06 raw and $52.524 allocated.
+Azure did not return Application Insights. Before Slice 1C.1, its evidence
+remained `not_returned`, and the CLI exited with status 1 without producing an
+allocated workload total. Slice 1C.1 now represents that query absence as
+`no_direct_charge_returned`, allowing allocation under the explicit billing
+expectation rather than asserting an observed zero. The live-style fixture
+verifies approximately $52.525882 allocated; this is not a new live query.
+The preserved manual path still reproduces $246.06 raw and $52.524 allocated.
 
 ## Two separate modeled lenses
 

@@ -33,6 +33,8 @@ def main() -> int:
         for resource in evidence["resources"]:
             cost = resource["actual_cost_usd"]
             display = f"{cost:.6f} USD" if cost is not None else "not_returned (not observed zero)"
+            if resource["cost_evidence_status"] == "no_direct_charge_returned":
+                display += " [no_direct_charge_returned; charges may be billed elsewhere]"
             print(f"{resource['name']}: {display}")
         combined = build_azure_runtime_cost_config(
             allocation_config=config, cost_evidence=evidence

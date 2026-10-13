@@ -142,6 +142,7 @@ def test_unsupported_method_fails(config):
         ("period", "start"), ("period", "end"), ("period", "currency"),
         ("source", "type"), ("source", "cost_basis"), ("source", "evidence_status"),
         ("resource", "name"), ("resource", "service"),
+        ("resource", "billing_expectation"),
         ("resource", "actual_cost_usd"), ("resource", "allocation"),
         ("allocation", "method"), ("allocation", "percentage"),
         ("allocation", "basis"), ("allocation", "confidence"),
@@ -171,6 +172,25 @@ def test_load_validates_contract(tmp_path):
     path.write_text("workload_id: contoso-demand-recovery\n", encoding="utf-8")
     with pytest.raises(ValueError, match="missing required field: resources"):
         load_azure_runtime_cost_config(path)
+
+
+@pytest.mark.parametrize("expectation", ["unknown", "", None])
+def test_invalid_billing_expectation_fails(config, expectation):
+    config["resources"][0]["billing_expectation"] = expectation
+    with pytest.raises(ValueError, match="billing_expectation"):
+        summarize_azure_runtime_cost(config)
+
+
+@pytest.mark.parametrize(
+    ("index", "cost"),
+    [(0, 0), (3, 1), (3, True)],
+)
+def test_no_direct_charge_status_cannot_bypass_evidence_validation(config, index, cost):
+    resource = config["resources"][index]
+    resource["cost_evidence_status"] = "no_direct_charge_returned"
+    resource["actual_cost_usd"] = cost
+    with pytest.raises(ValueError):
+        summarize_azure_runtime_cost(config)
 
 
 def test_direct_only_status_preserves_observed_billing(config):

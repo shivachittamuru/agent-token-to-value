@@ -5,6 +5,7 @@ resources:
   - name: search-n6tesxjlv4jjk
     resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/CognitiveGroup/providers/Microsoft.Search/searchServices/search-n6tesxjlv4jjk
     service: azure_ai_search
+    billing_expectation: direct_charge_expected
     allocation:
       method: fixed_percentage
       percentage: 0.20
@@ -17,6 +18,7 @@ resources:
   - name: rag-prompt-agent-resource
     resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.CognitiveServices/accounts/rag-prompt-agent-resource
     service: foundry_model_runtime
+    billing_expectation: direct_charge_expected
     allocation:
       method: direct
       percentage: 1.0
@@ -24,6 +26,7 @@ resources:
   - name: rag-prompt-agent-resource-logs
     resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.OperationalInsights/workspaces/rag-prompt-agent-resource-logs
     service: log_analytics
+    billing_expectation: direct_charge_expected
     allocation:
       method: direct
       percentage: 1.0
@@ -31,6 +34,7 @@ resources:
   - name: rag-prompt-agent-resource-appinsights
     resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.Insights/components/rag-prompt-agent-resource-appinsights
     service: application_insights
+    billing_expectation: may_be_billed_elsewhere
     allocation:
       method: direct
       percentage: 1.0

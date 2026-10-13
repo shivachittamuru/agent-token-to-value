@@ -39,17 +39,32 @@ def validate_azure_runtime_allocation_config(config: dict) -> None:
     _allocation_records(config)
 
 
+def missing_azure_resource_cost_evidence(resource: dict) -> dict:
+    """Describe absence from a billing query, not absence of all economic cost."""
+    expectation = _billing_expectation(resource)
+    billed_elsewhere = expectation == "may_be_billed_elsewhere"
+    return {
+        "billing_expectation": expectation,
+        "actual_cost_usd": 0.0 if billed_elsewhere else None,
+        "cost_evidence_status": (
+            "no_direct_charge_returned" if billed_elsewhere else "not_returned"
+        ),
+    }
+
+
 def build_azure_runtime_cost_config(
     *, allocation_config: dict, cost_evidence: dict
 ) -> dict:
     """Attach manual or automated evidence to rules, without allocating costs.
 
-    Missing observations remain explicit and prevent downstream summarization.
+    Missing required direct charges prevent downstream summarization. Optional
+    direct charges may be absent from an API query, without implying free service.
     """
     validate_azure_runtime_allocation_config(allocation_config)
     evidence = _mapping(cost_evidence, "cost_evidence")
     _period(_required(evidence, "period"))
     _source(_required(evidence, "source"))
+    is_api_evidence = evidence["source"]["type"] == "azure_cost_management_api"
     observations = _required(evidence, "resources")
     if not isinstance(observations, list):
         raise ValueError("cost_evidence.resources must be a list")
@@ -62,6 +77,11 @@ def build_azure_runtime_cost_config(
             raise ValueError(f"cost evidence resource is not allow-listed: {name}")
         if name in by_name:
             raise ValueError(f"duplicate resource name in cost evidence: {name}")
+        if (
+            "billing_expectation" in observation
+            and observation["billing_expectation"] != allowed[name]["billing_expectation"]
+        ):
+            raise ValueError(f"{name}: cost evidence billing_expectation mismatch")
         if "resource_id" in observation:
             resource_id = _text(observation["resource_id"], f"{name}.resource_id")
             configured_id = _text(
@@ -77,6 +97,13 @@ def build_azure_runtime_cost_config(
         elif status == "not_returned":
             if observation.get("actual_cost_usd") is not None:
                 raise ValueError(f"{name}: not_returned cannot have an actual cost")
+            if is_api_evidence:
+                observation = {
+                    **observation,
+                    **missing_azure_resource_cost_evidence(allowed[name]),
+                }
+        elif status == "no_direct_charge_returned":
+            _validate_no_direct_charge(allowed[name], observation)
         else:
             raise ValueError(f"{name}: unsupported cost_evidence_status: {status}")
         by_name[name] = observation
@@ -91,8 +118,11 @@ def build_azure_runtime_cost_config(
         resource.pop("cost_evidence_status", None)
         observation = by_name.get(resource["name"])
         if observation is None:
-            resource["actual_cost_usd"] = None
-            resource["cost_evidence_status"] = "not_returned"
+            if is_api_evidence:
+                resource.update(missing_azure_resource_cost_evidence(resource))
+            else:
+                resource["actual_cost_usd"] = None
+                resource["cost_evidence_status"] = "not_returned"
         else:
             for field in ("actual_cost_usd", "cost_evidence_status", "note"):
                 if field in observation:
@@ -117,6 +147,7 @@ def _allocation_records(config: dict) -> list[dict]:
             raise ValueError(f"duplicate resource name: {name}")
         names.add(name)
         service = _text(_required(resource, "service"), f"{name}.service")
+        expectation = _billing_expectation(resource)
         allocation = _mapping(_required(resource, "allocation"), f"{name}.allocation")
         method = _required(allocation, "method")
         if method not in ("direct", "fixed_percentage"):
@@ -132,6 +163,7 @@ def _allocation_records(config: dict) -> list[dict]:
         record = {
             "name": name,
             "service": service,
+            "billing_expectation": expectation,
             "allocation_percentage": percentage,
             "allocation_method": method,
         }
@@ -154,7 +186,7 @@ def _allocation_records(config: dict) -> list[dict]:
 
 
 def summarize_azure_runtime_cost(config: dict) -> dict:
-    """Allocate observed charges; fail rather than treat missing evidence as zero."""
+    """Allocate direct charges; reject missing required billing evidence."""
     resource_allocations = _allocation_records(config)
     period, period_days = _period(_required(config, "period"))
     source = _source(_required(config, "source"))
@@ -162,7 +194,9 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
     for record, resource in zip(resource_allocations, config["resources"], strict=True):
         name = record["name"]
         status = resource.get("cost_evidence_status", "observed_billing")
-        if status != "observed_billing":
+        if status == "no_direct_charge_returned":
+            _validate_no_direct_charge(resource, resource)
+        elif status != "observed_billing":
             raise ValueError(f"{name}: missing billing evidence ({status}); cannot allocate")
         actual_cost = _nonnegative_number(
             _required(resource, "actual_cost_usd"), f"{name}.actual_cost_usd"
@@ -193,6 +227,24 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
         "cost_source": source,
         "resource_allocations": resource_allocations,
     }
+
+
+def _billing_expectation(resource: dict) -> str:
+    expectation = _text(_required(resource, "billing_expectation"), "billing_expectation")
+    if expectation not in ("direct_charge_expected", "may_be_billed_elsewhere"):
+        raise ValueError(f"unsupported billing_expectation: {expectation}")
+    return expectation
+
+
+def _validate_no_direct_charge(resource: dict, observation: dict) -> None:
+    name = resource["name"]
+    if resource["billing_expectation"] != "may_be_billed_elsewhere":
+        raise ValueError(f"{name}: no_direct_charge_returned requires may_be_billed_elsewhere")
+    cost = _nonnegative_number(
+        _required(observation, "actual_cost_usd"), f"{name}.actual_cost_usd"
+    )
+    if cost != 0:
+        raise ValueError(f"{name}: no_direct_charge_returned requires zero direct charge")
 
 
 def apply_azure_runtime_cost_to_modeled_economics(

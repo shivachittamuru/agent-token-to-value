@@ -16,6 +16,7 @@ from azure.core.rest import HttpRequest, HttpResponse
 from azure.identity import DefaultAzureCredential
 
 from foundry_prompt_agent.azure_runtime_cost import (
+    missing_azure_resource_cost_evidence,
     validate_azure_runtime_allocation_config,
 )
 
@@ -227,9 +228,14 @@ def fetch_azure_resource_costs(
             {
                 "name": resource["name"],
                 "resource_id": resource["resource_id"],
-                "actual_cost_usd": costs.get(key),
-                "cost_evidence_status": (
-                    "observed_billing" if key in costs else "not_returned"
+                **(
+                    {
+                        "billing_expectation": resource["billing_expectation"],
+                        "actual_cost_usd": costs[key],
+                        "cost_evidence_status": "observed_billing",
+                    }
+                    if key in costs
+                    else missing_azure_resource_cost_evidence(resource)
                 ),
             }
             for key, resource in allowed.items()
