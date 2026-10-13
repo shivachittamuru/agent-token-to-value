@@ -1,0 +1,49 @@
+workload_id: contoso-demand-recovery
+
+period:
+  start: 2026-09-01
+  end: 2026-09-30
+  currency: USD
+
+source:
+  type: azure_cost_management_manual
+  cost_basis: actual_cost
+  scope: subscription
+  evidence_status: observed_billing
+
+resources:
+  - name: search-n6tesxjlv4jjk
+    service: azure_ai_search
+    actual_cost_usd: 241.92
+    allocation:
+      method: fixed_percentage
+      percentage: 0.20
+      basis: engineering_estimate
+      confidence: approximate
+      reason: >-
+        Search service is shared across workloads and historical per-index
+        query logs were unavailable for September.
+
+  - name: rag-prompt-agent-resource
+    service: foundry_model_runtime
+    actual_cost_usd: 4.12
+    allocation:
+      method: direct
+      percentage: 1.0
+
+  - name: rag-prompt-agent-resource-logs
+    service: log_analytics
+    actual_cost_usd: 0.02
+    allocation:
+      method: direct
+      percentage: 1.0
+
+  - name: rag-prompt-agent-resource-appinsights
+    service: application_insights
+    actual_cost_usd: 0.0
+    allocation:
+      method: direct
+      percentage: 1.0
+    note: >-
+      No direct September cost line item. Telemetry cost may be attributed
+      through the linked Log Analytics workspace.
