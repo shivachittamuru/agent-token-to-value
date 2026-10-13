@@ -806,6 +806,7 @@ source = { editable = "." }
 dependencies = [
     { name = "azure-ai-evaluation" },
     { name = "azure-ai-projects" },
+    { name = "azure-core" },
     { name = "azure-identity" },
     { name = "ipykernel" },
     { name = "jupyter" },
@@ -826,6 +827,7 @@ dev = [
 requires-dist = [
     { name = "azure-ai-evaluation", specifier = ">=1.18.3" },
     { name = "azure-ai-projects", specifier = ">=2.4.0" },
+    { name = "azure-core", specifier = ">=1.41.0" },
     { name = "azure-identity", specifier = ">=1.25.3" },
     { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "jupyter", specifier = ">=1.1.1" },

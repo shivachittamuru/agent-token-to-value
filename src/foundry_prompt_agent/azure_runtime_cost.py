@@ -1,4 +1,4 @@
-"""Manual Azure billing evidence and deterministic workload cost allocation.
+"""Azure billing evidence and deterministic workload cost allocation.
 
 Runtime cost includes the resource's Foundry/model billing. It must not be
 added to projected inference cost, which remains a separate modeled lens.
@@ -17,25 +17,98 @@ import yaml
 
 def load_azure_runtime_cost_config(path: Path) -> dict:
     """Load and validate manual billing evidence, raising on invalid input."""
-    with path.open("r", encoding="utf-8") as file:
-        config = yaml.safe_load(file)
+    config = load_azure_runtime_allocation_config(path)
+    config = build_azure_runtime_cost_config(
+        allocation_config=config,
+        cost_evidence=_mapping(_required(config, "manual_evidence"), "manual_evidence"),
+    )
     summarize_azure_runtime_cost(config)
     return config
 
 
-def summarize_azure_runtime_cost(config: dict) -> dict:
-    """Allocate selected resource charges over an inclusive billing period."""
+def load_azure_runtime_allocation_config(path: Path) -> dict:
+    """Load resource identity/allocation rules without selecting billing evidence."""
+    with path.open("r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+    validate_azure_runtime_allocation_config(config)
+    return config
+
+
+def validate_azure_runtime_allocation_config(config: dict) -> None:
+    """Validate the shared allocation contract independently of actual costs."""
+    _allocation_records(config)
+
+
+def build_azure_runtime_cost_config(
+    *, allocation_config: dict, cost_evidence: dict
+) -> dict:
+    """Attach manual or automated evidence to rules, without allocating costs.
+
+    Missing observations remain explicit and prevent downstream summarization.
+    """
+    validate_azure_runtime_allocation_config(allocation_config)
+    evidence = _mapping(cost_evidence, "cost_evidence")
+    _period(_required(evidence, "period"))
+    _source(_required(evidence, "source"))
+    observations = _required(evidence, "resources")
+    if not isinstance(observations, list):
+        raise ValueError("cost_evidence.resources must be a list")
+    allowed = {resource["name"]: resource for resource in allocation_config["resources"]}
+    by_name = {}
+    for observation in observations:
+        observation = _mapping(observation, "cost observation")
+        name = _text(_required(observation, "name"), "cost observation.name")
+        if name not in allowed:
+            raise ValueError(f"cost evidence resource is not allow-listed: {name}")
+        if name in by_name:
+            raise ValueError(f"duplicate resource name in cost evidence: {name}")
+        if "resource_id" in observation:
+            resource_id = _text(observation["resource_id"], f"{name}.resource_id")
+            configured_id = _text(
+                _required(allowed[name], "resource_id"), f"{name}.resource_id"
+            )
+            if resource_id.casefold() != configured_id.casefold():
+                raise ValueError(f"cost evidence resource_id mismatch: {name}")
+        status = observation.get("cost_evidence_status", "observed_billing")
+        if status == "observed_billing":
+            _nonnegative_number(
+                _required(observation, "actual_cost_usd"), f"{name}.actual_cost_usd"
+            )
+        elif status == "not_returned":
+            if observation.get("actual_cost_usd") is not None:
+                raise ValueError(f"{name}: not_returned cannot have an actual cost")
+        else:
+            raise ValueError(f"{name}: unsupported cost_evidence_status: {status}")
+        by_name[name] = observation
+
+    result = deepcopy(allocation_config)
+    result.pop("manual_evidence", None)
+    result["period"] = deepcopy(evidence["period"])
+    result["source"] = deepcopy(evidence["source"])
+    for resource in result["resources"]:
+        # Never carry stale manual observations into a different evidence period.
+        resource.pop("actual_cost_usd", None)
+        resource.pop("cost_evidence_status", None)
+        observation = by_name.get(resource["name"])
+        if observation is None:
+            resource["actual_cost_usd"] = None
+            resource["cost_evidence_status"] = "not_returned"
+        else:
+            for field in ("actual_cost_usd", "cost_evidence_status", "note"):
+                if field in observation:
+                    resource[field] = deepcopy(observation[field])
+    return result
+
+
+def _allocation_records(config: dict) -> list[dict]:
     config = _mapping(config, "config")
-    workload_id = _text(_required(config, "workload_id"), "workload_id")
-    period, period_days = _period(_required(config, "period"))
-    source = _source(_required(config, "source"))
+    _text(_required(config, "workload_id"), "workload_id")
     resources = _required(config, "resources")
     if not isinstance(resources, list) or not resources:
-        raise ValueError("resources must be a non-empty list of billing evidence")
+        raise ValueError("resources must be a non-empty resource allow-list")
 
     names: set[str] = set()
     resource_allocations = []
-    estimated_allocation = False
     for index, resource in enumerate(resources):
         label = f"resources[{index}]"
         resource = _mapping(resource, label)
@@ -44,9 +117,6 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
             raise ValueError(f"duplicate resource name: {name}")
         names.add(name)
         service = _text(_required(resource, "service"), f"{name}.service")
-        actual_cost = _nonnegative_number(
-            _required(resource, "actual_cost_usd"), f"{name}.actual_cost_usd"
-        )
         allocation = _mapping(_required(resource, "allocation"), f"{name}.allocation")
         method = _required(allocation, "method")
         if method not in ("direct", "fixed_percentage"):
@@ -62,11 +132,11 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
         record = {
             "name": name,
             "service": service,
-            "actual_cost_usd": actual_cost,
             "allocation_percentage": percentage,
-            "allocated_cost_usd": actual_cost * percentage,
             "allocation_method": method,
         }
+        if "resource_id" in resource:
+            record["resource_id"] = _text(resource["resource_id"], f"{name}.resource_id")
         for field in ("basis", "confidence"):
             if method == "fixed_percentage" or field in allocation:
                 record[f"allocation_{field}"] = _text(
@@ -80,6 +150,28 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
             if field in resource:
                 record[field] = _text(resource[field], f"{name}.{field}")
         resource_allocations.append(record)
+    return resource_allocations
+
+
+def summarize_azure_runtime_cost(config: dict) -> dict:
+    """Allocate observed charges; fail rather than treat missing evidence as zero."""
+    resource_allocations = _allocation_records(config)
+    period, period_days = _period(_required(config, "period"))
+    source = _source(_required(config, "source"))
+    estimated_allocation = False
+    for record, resource in zip(resource_allocations, config["resources"], strict=True):
+        name = record["name"]
+        status = resource.get("cost_evidence_status", "observed_billing")
+        if status != "observed_billing":
+            raise ValueError(f"{name}: missing billing evidence ({status}); cannot allocate")
+        actual_cost = _nonnegative_number(
+            _required(resource, "actual_cost_usd"), f"{name}.actual_cost_usd"
+        )
+        record["actual_cost_usd"] = actual_cost
+        record["allocated_cost_usd"] = actual_cost * record["allocation_percentage"]
+        if "cost_evidence_status" in resource:
+            record["cost_evidence_status"] = status
+        method = record["allocation_method"]
         estimated_allocation |= method == "fixed_percentage" and actual_cost > 0
 
     selected_cost = fsum(
@@ -89,7 +181,7 @@ def summarize_azure_runtime_cost(config: dict) -> dict:
         record["allocated_cost_usd"] for record in resource_allocations
     )
     return {
-        "workload_id": workload_id,
+        "workload_id": config["workload_id"],
         "cost_period": period,
         "period_days": period_days,
         "actual_selected_resource_cost_usd": selected_cost,
@@ -200,8 +292,11 @@ def _period(value: object) -> tuple[dict, int]:
 
 def _source(value: object) -> dict:
     source = _mapping(value, "source")
+    if _required(source, "type") not in (
+        "azure_cost_management_manual", "azure_cost_management_api"
+    ):
+        raise ValueError("source.type must identify manual or API Cost Management evidence")
     expected = {
-        "type": "azure_cost_management_manual",
         "cost_basis": "actual_cost",
         "evidence_status": "observed_billing",
     }

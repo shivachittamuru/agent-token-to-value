@@ -169,7 +169,7 @@ def test_invalid_config_fails(invalid):
 def test_load_validates_contract(tmp_path):
     path = tmp_path / "invalid.yaml"
     path.write_text("workload_id: contoso-demand-recovery\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="missing required field: period"):
+    with pytest.raises(ValueError, match="missing required field: resources"):
         load_azure_runtime_cost_config(path)
 
 

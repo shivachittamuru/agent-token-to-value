@@ -1,12 +1,14 @@
 ---
-title: Manual Azure runtime cost allocation
-description: September 2026 billing evidence and a separate modeled runtime economics lens.
+title: Azure runtime cost evidence and allocation
+description: Manual and automated monthly billing evidence feeding one allocation model.
 ---
 
 ## Evidence boundary
 
-[azure_runtime_cost.yaml](../economics/azure_runtime_cost.yaml) records manually
-validated Azure Cost Management Actual Cost for September 1-30, 2026, in USD.
+[azure_runtime_cost.yaml](../economics/azure_runtime_cost.yaml) separates the
+subscription, full resource-ID allow-list, and allocation rules from the
+`manual_evidence` block. That block retains manually validated Azure Cost
+Management Actual Cost for September 1-30, 2026, in USD.
 Only resources with billing evidence are selected. The Application Insights
 zero-cost entry records no direct September line item; telemetry charges may
 be attributed through the linked Log Analytics workspace.
@@ -51,6 +53,11 @@ Missing fields, duplicate resource names, unsupported methods, invalid dates,
 and non-USD currencies fail with `ValueError`. Periods include both endpoints.
 Summary dates are ISO strings; raw YAML dates may be Python `date` values.
 
+`load_azure_runtime_cost_config` still selects the September manual fixture.
+For automated ingestion, use `load_azure_runtime_allocation_config`, then
+`build_azure_runtime_cost_config` to attach new evidence to those same rules.
+The builder never fills gaps using the checked-in manual fixture.
+
 The summary preserves actual selected-resource cost, allocated workload cost,
 source metadata, and individual allocations. A positive-cost resource using a
 fixed percentage conservatively makes the summary `partially_allocated`;
@@ -62,6 +69,82 @@ scenario. It returns a separate record and does not mutate either input.
 Select a monthly scenario aligned with the cost period; the helper does not
 prorate the modeled numerator. Zero runtime cost returns an infinite multiple,
 following the existing inference metric convention, even for a zero numerator.
+
+## Automated completed-month ingestion
+
+[azure_cost_management.py](../src/foundry_prompt_agent/azure_cost_management.py)
+queries the configured subscription using the
+[Cost Management Query API](https://learn.microsoft.com/en-us/rest/api/cost-management/query/usage?view=rest-cost-management-2025-03-01).
+It uses `ActualCost`, a custom UTC calendar-month interval, a `ResourceId`
+dimension filter containing only the four allowed IDs, and `Sum(PreTaxCost)`
+grouped by `ResourceId`, without daily granularity. Billing currency must be
+USD; there is no currency conversion, forecast, or amortized-cost path.
+
+Only completed calendar months are accepted. Partial periods, the current
+month, and future months fail before credentials or API calls. This protects
+the monthly modeled numerator from comparison with partial-month cost.
+
+The REST adapter uses `DefaultAzureCredential`, including your existing
+Azure CLI login, with Azure Core's bearer-token and retry policies. It follows
+every `nextLink` using the same POST body and rejects pagination loops or
+links outside the original subscription query endpoint. Authentication,
+permission, HTTP, and malformed-response errors are surfaced, not converted
+to zero or partial totals.
+
+Rows are decoded by column name, not position. Resource-ID matching is
+case-insensitive, unrelated rows are ignored, and duplicate resource totals
+within or across pages fail rather than risk double-counting.
+
+Returned zero-cost rows have `actual_cost_usd: 0` and
+`cost_evidence_status: observed_billing`. An absent resource has
+`actual_cost_usd: null` and `cost_evidence_status: not_returned`.
+Absence does not establish zero billing. The allocator rejects incomplete
+evidence, so neither a complete workload total nor runtime economics is
+manufactured from it. In particular, an absent Application Insights row
+cannot inherit the manually validated September zero.
+
+### Read-only live validation
+
+Install the project dependencies with `uv sync`, then authenticate with
+`az login` in the tenant containing the configured subscription. You need
+subscription-level Cost Management read/query access, typically the
+`Cost Management Reader` role, and any billing-account cost-visibility
+settings required by your subscription agreement.
+See [assign Cost Management access](https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/assign-access-acm-data).
+
+The implementation uses `azure-identity` and `azure-core`, not an additional
+management SDK. The `CostQueryAdapter` protocol allows unit tests to use
+fake response pages without constructing credentials or making Azure calls.
+
+```powershell
+uv run python scripts\fetch_azure_runtime_cost.py --month 2026-09
+```
+
+[fetch_azure_runtime_cost.py](../scripts/fetch_azure_runtime_cost.py) prints
+each resource's evidence, then uses the existing allocator to print raw and
+allocated totals. It writes no files and never updates the manual fixture or
+run artifacts. Missing evidence is printed explicitly and produces a nonzero
+exit status rather than a success-shaped total.
+
+September validation expectations are $246.06 raw selected-resource cost and
+$52.524 allocated runtime cost. These remain regression expectations, not
+production constants. If Azure omits the zero-cost Application Insights row,
+compare the three returned charges with manual evidence, but do not claim a
+complete automated allocation until missing evidence is resolved.
+
+### September live validation result
+
+The read-only query on October 13, 2026 returned Search at $241.920000,
+Foundry/model runtime at approximately $4.123483, and Log Analytics at
+approximately $0.018399. These resource amounts match the manual fixture when
+rounded to cents. Their observed-row subtotal is approximately $246.061882,
+not a complete allow-list total.
+
+Azure did not return Application Insights. Its evidence remained
+`not_returned`, and the CLI exited with status 1 without producing an allocated
+workload total. The automated $52.524 baseline therefore was not fully
+validated live. The preserved manual path and complete fake-response tests
+still reproduce $246.06 raw and $52.524 allocated.
 
 ## Two separate modeled lenses
 
@@ -87,5 +170,5 @@ does not establish complete customer-cost evidence.
 
 The numerator remains modeled. These outputs do not establish realized
 contribution, ROI, incremental economics, or Customer Net Economic Value.
-No ingestion automation, FinOps Toolkit integration, runner integration, or
-dashboard changes are included.
+No FinOps Toolkit integration, runner integration, simulation changes, run
+artifact persistence, or dashboard changes are included.

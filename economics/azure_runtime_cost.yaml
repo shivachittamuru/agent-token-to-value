@@ -1,20 +1,10 @@
 workload_id: contoso-demand-recovery
-
-period:
-  start: 2026-09-01
-  end: 2026-09-30
-  currency: USD
-
-source:
-  type: azure_cost_management_manual
-  cost_basis: actual_cost
-  scope: subscription
-  evidence_status: observed_billing
+subscription_id: 1fad602f-d06f-46af-8f70-78a2c2c53b24
 
 resources:
   - name: search-n6tesxjlv4jjk
+    resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/CognitiveGroup/providers/Microsoft.Search/searchServices/search-n6tesxjlv4jjk
     service: azure_ai_search
-    actual_cost_usd: 241.92
     allocation:
       method: fixed_percentage
       percentage: 0.20
@@ -25,25 +15,45 @@ resources:
         query logs were unavailable for September.
 
   - name: rag-prompt-agent-resource
+    resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.CognitiveServices/accounts/rag-prompt-agent-resource
     service: foundry_model_runtime
-    actual_cost_usd: 4.12
     allocation:
       method: direct
       percentage: 1.0
 
   - name: rag-prompt-agent-resource-logs
+    resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.OperationalInsights/workspaces/rag-prompt-agent-resource-logs
     service: log_analytics
-    actual_cost_usd: 0.02
     allocation:
       method: direct
       percentage: 1.0
 
   - name: rag-prompt-agent-resource-appinsights
+    resource_id: /subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.Insights/components/rag-prompt-agent-resource-appinsights
     service: application_insights
-    actual_cost_usd: 0.0
     allocation:
       method: direct
       percentage: 1.0
-    note: >-
-      No direct September cost line item. Telemetry cost may be attributed
-      through the linked Log Analytics workspace.
+
+manual_evidence:
+  period:
+    start: 2026-09-01
+    end: 2026-09-30
+    currency: USD
+  source:
+    type: azure_cost_management_manual
+    cost_basis: actual_cost
+    scope: subscription
+    evidence_status: observed_billing
+  resources:
+    - name: search-n6tesxjlv4jjk
+      actual_cost_usd: 241.92
+    - name: rag-prompt-agent-resource
+      actual_cost_usd: 4.12
+    - name: rag-prompt-agent-resource-logs
+      actual_cost_usd: 0.02
+    - name: rag-prompt-agent-resource-appinsights
+      actual_cost_usd: 0.0
+      note: >-
+        No direct September cost line item. Telemetry cost may be attributed
+        through the linked Log Analytics workspace.
