@@ -15,6 +15,7 @@ from foundry_prompt_agent.azure_runtime_cost import (
     load_azure_runtime_cost_config,
     summarize_azure_runtime_cost,
 )
+from foundry_prompt_agent.cost_snapshot import load_cost_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "economics" / "azure_runtime_cost.yaml"
@@ -547,3 +548,55 @@ def test_cli_prints_costs_without_writing_fixture(monkeypatch, capsys, config, b
         assert not output.err
         if missing == "elsewhere":
             assert "0.000000 USD [no_direct_charge_returned; charges may be billed elsewhere]" in output.out
+
+
+@pytest.mark.parametrize("mode", ["no_save", "default", "explicit"])
+def test_fetch_cli_snapshot_saving_is_optional(monkeypatch, tmp_path, capsys, config, billing_page, mode):
+    spec = importlib.util.spec_from_file_location(
+        "snapshot_fetch_cli", ROOT / "scripts" / "fetch_azure_runtime_cost.py"
+    )
+    assert spec is not None and spec.loader is not None
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    billing_page["properties"]["rows"].pop()
+    billing_page["properties"]["rows"][1][0] = 4.123483
+    billing_page["properties"]["rows"][2][0] = 0.018399
+    evidence = fetch(config, [billing_page])
+    monkeypatch.setattr(cli, "fetch_azure_resource_costs", lambda **kwargs: evidence)
+    monkeypatch.chdir(tmp_path)
+    args = ["fetch_cost_cli", "--month", "2026-09"]
+    path = tmp_path / "cost_snapshots" / "contoso-demand-recovery-2026-09.json"
+    if mode == "default":
+        args.append("--save-snapshot")
+    elif mode == "explicit":
+        path = tmp_path / "custom" / "september.json"
+        args.extend(["--snapshot-path", str(path)])
+    monkeypatch.setattr(sys, "argv", args)
+    before = CONFIG_PATH.read_bytes()
+    assert cli.main() == 0
+    output = capsys.readouterr()
+    assert CONFIG_PATH.read_bytes() == before
+    if mode == "no_save":
+        assert not list(tmp_path.iterdir())
+        assert "Saved cost snapshot" not in output.out
+    else:
+        saved = load_cost_snapshot(path)
+        assert saved["allocated_azure_runtime_cost_usd"] == pytest.approx(52.525882)
+        assert saved["resource_allocations"][3]["cost_evidence_status"] == "no_direct_charge_returned"
+        assert "Saved cost snapshot" in output.out
+
+
+def test_fetch_cli_never_saves_incomplete_cost_evidence(monkeypatch, tmp_path, config, billing_page):
+    spec = importlib.util.spec_from_file_location(
+        "incomplete_snapshot_cli", ROOT / "scripts" / "fetch_azure_runtime_cost.py"
+    )
+    assert spec is not None and spec.loader is not None
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    billing_page["properties"]["rows"].pop(2)
+    evidence = fetch(config, [billing_page])
+    monkeypatch.setattr(cli, "fetch_azure_resource_costs", lambda **kwargs: evidence)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fetch_cost_cli", "--month", "2026-09", "--save-snapshot"])
+    assert cli.main() == 1
+    assert not list(tmp_path.iterdir())

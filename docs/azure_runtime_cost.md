@@ -140,8 +140,8 @@ uv run python scripts\fetch_azure_runtime_cost.py --month 2026-09
 
 [fetch_azure_runtime_cost.py](../scripts/fetch_azure_runtime_cost.py) prints
 each resource's evidence, then uses the existing allocator to print raw and
-allocated totals. It writes no files and never updates the manual fixture or
-run artifacts. Missing required direct charges are printed explicitly and
+allocated totals. Without snapshot-saving flags it writes no files. It never
+updates the manual fixture or run artifacts. Missing required direct charges are printed explicitly and
 produce a nonzero exit status rather than a success-shaped total. An absent
 Application Insights direct charge is printed with
 `no_direct_charge_returned` and a warning that charges may be billed elsewhere.
@@ -171,6 +171,114 @@ expectation rather than asserting an observed zero. The live-style fixture
 verifies approximately $52.525882 allocated; this is not a new live query.
 The preserved manual path still reproduces $246.06 raw and $52.524 allocated.
 
+## Period-level snapshots and run packages
+
+Azure billing data and agent execution operate on different clocks.
+[cost_snapshot.py](../src/foundry_prompt_agent/cost_snapshot.py) persists an
+already-prepared cost summary as local monthly evidence, without Azure SDK
+imports or API calls. Both manual and automated summaries normalize into
+the same snapshot contract, retaining source provenance.
+
+The default snapshot ID is `workload_id-YYYY-MM`, for example
+`contoso-demand-recovery-2026-09`, not a run ID. The default CLI save path is
+`cost_snapshots/contoso-demand-recovery-2026-09.json`.
+
+### Snapshot contract
+
+| Field                                       | Meaning                                      |
+|---------------------------------------------|----------------------------------------------|
+| `snapshot_id`                               | Period-level, filename-safe evidence ID      |
+| `workload_id`                               | Workload whose resource boundary was used    |
+| `cost_period`                               | Inclusive start, end, and USD currency       |
+| `period_days`                               | Number of days in the completed month        |
+| `created_at`                                | Timezone-aware ISO creation timestamp        |
+| `evidence_source`                           | Original manual or API source metadata       |
+| `actual_selected_resource_cost_usd`         | Selected-resource direct charges             |
+| `allocated_azure_runtime_cost_usd`           | Workload-attributed runtime cost              |
+| `allocated_azure_runtime_cost_per_day_usd`   | Allocated monthly cost divided by days       |
+| `allocation_status`                         | Direct or partially allocated status         |
+| `resource_allocations`                      | Full resource-level evidence and allocations |
+
+Resource records preserve name, service, resource ID when supplied,
+`billing_expectation`, `cost_evidence_status`, actual charge, allocation
+percentage, allocated cost, allocation method, and basis/confidence when
+relevant. Notes and allocation reasons also survive. Manual summaries whose
+resource status was implicit carry it explicitly as `observed_billing`;
+API-query absence remains `no_direct_charge_returned`, never an observed zero.
+
+Validation rejects partial or uncompleted months, missing provenance,
+duplicate resources or JSON fields, non-finite amounts, inconsistent totals,
+and invalid billing/allocation states. It reuses the existing allocator to
+check arithmetic rather than introducing allocation formulas. Saves validate
+first and atomically replace the destination; failed writes do not leave a
+partial snapshot. Keep snapshots referenced by runs unchanged, and use a
+different path for corrected evidence.
+
+### Preparing evidence separately
+
+Live retrieval is still an explicit preparation step:
+
+```powershell
+uv run python scripts\fetch_azure_runtime_cost.py --month 2026-09 --save-snapshot
+uv run python scripts\fetch_azure_runtime_cost.py --month 2026-09 --snapshot-path cost_snapshots\september-reviewed.json
+```
+
+`--snapshot-path` also requests saving. With neither flag, the command remains
+read-only. Missing required direct charges prevent snapshot creation.
+
+The preserved manual fixture can be prepared without Azure connectivity:
+
+```python
+from pathlib import Path
+
+from foundry_prompt_agent.azure_runtime_cost import (
+    load_azure_runtime_cost_config,
+    summarize_azure_runtime_cost,
+)
+from foundry_prompt_agent.cost_snapshot import build_cost_snapshot, save_cost_snapshot
+
+runtime = summarize_azure_runtime_cost(
+    load_azure_runtime_cost_config(Path("economics") / "azure_runtime_cost.yaml")
+)
+snapshot = build_cost_snapshot(azure_runtime_cost=runtime)
+save_cost_snapshot(
+    snapshot,
+    Path("cost_snapshots") / f"{snapshot['snapshot_id']}.json",
+)
+```
+
+### Optional runner input
+
+Both runners load and validate local snapshots before executing agent cases:
+
+```powershell
+uv run python scripts\run_evaluation.py --cost-snapshot cost_snapshots\contoso-demand-recovery-2026-09.json
+uv run python scripts\run_simulation.py --seed 42 --cost-snapshot cost_snapshots\contoso-demand-recovery-2026-09.json
+```
+
+[run_artifacts.py](../src/foundry_prompt_agent/run_artifacts.py) adds a compact
+`azure_runtime_cost` section to the run's summary: snapshot ID, workload,
+period, creation timestamp, source metadata, raw and allocated costs,
+allocation status, and the input snapshot path when supplied. Full resource
+allocations stay in the snapshot file. The API also accepts a loaded snapshot
+dict without a path; prepare and retain its full snapshot separately.
+
+The monthly bill is operating-cost evidence referenced by the run, not cost
+caused by that run. No run-level Azure cost or cost-per-run claim is created.
+Evaluation and simulation never retrieve live Cost Management data, and
+runs without a snapshot retain the existing summary shape.
+
+Runtime-adjusted modeled economics are deliberately not added to run
+summaries in this slice. The current business scenario lacks an explicit
+calendar-month economic basis; a monthly metric name or a 30-day projection
+does not establish compatibility with September billing. Cost evidence is
+retained without inventing or prorating a numerator. AI Value Multiple,
+Customer Net Economic Value, and decision/action logic remain unchanged.
+
+Runtime cost still excludes human effort, governance, support, and other
+relevant customer costs. Persisting it does not turn it into Total Relevant
+Customer Cost or establish complete customer-cost evidence.
+
 ## Two separate modeled lenses
 
 * Modeled AI Value Multiple = modeled recovered contribution / projected inference cost
@@ -195,5 +303,6 @@ does not establish complete customer-cost evidence.
 
 The numerator remains modeled. These outputs do not establish realized
 contribution, ROI, incremental economics, or Customer Net Economic Value.
-No FinOps Toolkit integration, runner integration, simulation changes, run
-artifact persistence, or dashboard changes are included.
+No FinOps Toolkit integration, dashboard changes, or changes to simulation
+economics are included. Runner integration only persists optional local
+period-level cost evidence.

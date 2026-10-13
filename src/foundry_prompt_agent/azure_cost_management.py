@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 import re
-from datetime import date, datetime, timezone
+from datetime import date
 from math import isfinite
 from typing import Iterable, Iterator, Protocol
 from urllib.parse import urlsplit
@@ -17,6 +17,7 @@ from azure.identity import DefaultAzureCredential
 
 from foundry_prompt_agent.azure_runtime_cost import (
     missing_azure_resource_cost_evidence,
+    validate_completed_calendar_month,
     validate_azure_runtime_allocation_config,
 )
 
@@ -81,21 +82,6 @@ class AzureCostManagementAdapter:
                         raise ValueError("Cost Management nextLink must be a URL or null")
                     yield payload
                     url = next_link
-
-
-def validate_completed_calendar_month(
-    *, start: date, end: date, today: date | None = None
-) -> None:
-    """Reject partial, current, and future months before authenticating."""
-    for label, value in (("start", start), ("end", end)):
-        if not isinstance(value, date) or isinstance(value, datetime):
-            raise ValueError(f"{label} must be a date")
-    last_day = calendar.monthrange(start.year, start.month)[1]
-    if start.day != 1 or end != date(start.year, start.month, last_day):
-        raise ValueError("only a complete calendar month is supported")
-    current_date = today if today is not None else datetime.now(timezone.utc).date()
-    if end >= current_date.replace(day=1):
-        raise ValueError("only a completed calendar month is supported")
 
 
 def calendar_month(month: str) -> tuple[date, date]:

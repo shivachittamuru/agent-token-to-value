@@ -9,8 +9,11 @@ never recalculates economics or decision logic, and it preserves Unknown as
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 from pathlib import Path
+
+from foundry_prompt_agent.cost_snapshot import validate_cost_snapshot
 
 RUNS_DIR = Path("runs")
 
@@ -173,10 +176,22 @@ def build_run_summary(
     simulation: dict | None = None,
     synthetic_experiment: dict | None = None,
     synthetic_economics: dict | None = None,
+    cost_snapshot: dict | None = None,
+    cost_snapshot_path: Path | None = None,
 ) -> dict:
-    """Assemble the run-level summary, preserving each section's exact values."""
+    """Preserve run evidence and optionally reference monthly operating costs.
 
-    return {
+    The current modeled scenario has no calendar-month economic basis, so this
+    layer never combines its numerator with a snapshot or recalculates economics.
+    """
+    if cost_snapshot_path is not None and cost_snapshot is None:
+        raise ValueError("cost_snapshot_path requires a loaded cost_snapshot")
+    if cost_snapshot is not None:
+        validate_cost_snapshot(cost_snapshot)
+        if cost_snapshot["workload_id"] != workload_id:
+            raise ValueError("cost snapshot workload_id does not match the run workload")
+
+    summary = {
         "run_id": run_id,
         "workload_id": workload_id,
         "run_mode": run_mode,
@@ -195,6 +210,19 @@ def build_run_summary(
         "decision_gates": decision_gates,
         "portfolio_action": portfolio_action,
     }
+    if cost_snapshot is not None:
+        summary["azure_runtime_cost"] = {
+            field: deepcopy(cost_snapshot[field])
+            for field in (
+                "snapshot_id", "workload_id", "cost_period", "created_at",
+                "evidence_source", "period_days", "actual_selected_resource_cost_usd",
+                "allocated_azure_runtime_cost_usd",
+                "allocated_azure_runtime_cost_per_day_usd", "allocation_status",
+            )
+        }
+        if cost_snapshot_path is not None:
+            summary["azure_runtime_cost"]["snapshot_path"] = str(cost_snapshot_path)
+    return summary
 
 
 def run_dir(run_id: str, base: Path = RUNS_DIR) -> Path:

@@ -8,6 +8,7 @@ Orchestration only: dataset -> agent -> measured tokens -> Foundry evaluation
 -> quality gate -> business economics -> experiment history.
 """
 
+import argparse
 import json
 import os
 from datetime import datetime, timezone
@@ -22,6 +23,7 @@ from foundry_prompt_agent.business_economics import (
 from foundry_prompt_agent.business_outcomes import (
     build_business_outcome_records,
 )
+from foundry_prompt_agent.cost_snapshot import load_cost_snapshot
 from foundry_prompt_agent.decision_gates import (
     build_decision_gate_record,
 )
@@ -75,6 +77,12 @@ from foundry_prompt_agent.tokenomics import (
 DATASET_PATH = Path("evals/contoso_agent_eval_v3.jsonl")
 RESULTS_PATH = Path("evals/results_v3.jsonl")
 ASSUMPTIONS_PATH = Path("economics/business_assumptions.yaml")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the regression evaluation.")
+    parser.add_argument("--cost-snapshot", type=Path, help="Prepared monthly cost evidence (no billing API calls)")
+    return parser.parse_args()
 
 
 def build_run_id() -> str:
@@ -559,6 +567,8 @@ def process_completed_run(
     run_mode: str = "regression",
     simulation_metadata: dict | None = None,
     pilot_simulator=None,
+    cost_snapshot: dict | None = None,
+    cost_snapshot_path: Path | None = None,
 ) -> None:
     """Run the full evidence pipeline for a completed evaluation and persist it.
 
@@ -792,6 +802,8 @@ def process_completed_run(
             simulation=simulation_metadata,
             synthetic_experiment=synthetic_experiment_section,
             synthetic_economics=synthetic_economics_record,
+            cost_snapshot=cost_snapshot,
+            cost_snapshot_path=cost_snapshot_path,
         )
         interactions_path, summary_path = persist_run_package(
             run_id, interaction_records, run_summary
@@ -821,6 +833,11 @@ def process_completed_run(
 
 
 def main() -> None:
+    args = parse_args()
+    cost_snapshot = (
+        load_cost_snapshot(args.cost_snapshot, workload_id=WORKLOAD_ID)
+        if args.cost_snapshot is not None else None
+    )
     judge_model = os.environ["FOUNDRY_JUDGE_MODEL"]
 
     behavior_threshold = float(
@@ -855,6 +872,8 @@ def main() -> None:
         execution_records=execution_records,
         run=run,
         run_mode="regression",
+        cost_snapshot=cost_snapshot,
+        cost_snapshot_path=args.cost_snapshot,
     )
 
     # 4. CI quality gate remains separate from the economics.

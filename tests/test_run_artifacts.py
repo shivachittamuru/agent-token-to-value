@@ -1,7 +1,14 @@
 import json
+from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
+from foundry_prompt_agent.azure_runtime_cost import (
+    load_azure_runtime_cost_config,
+    summarize_azure_runtime_cost,
+)
+from foundry_prompt_agent.cost_snapshot import build_cost_snapshot, save_cost_snapshot
 from foundry_prompt_agent.run_artifacts import (
     build_interaction_records,
     build_run_summary,
@@ -225,7 +232,7 @@ def test_mismatched_identity_fails_loudly():
         )
 
 
-def summary_sections() -> dict:
+def summary_sections(*, cost_snapshot=None, cost_snapshot_path=None) -> dict:
     return build_run_summary(
         run_id="run1",
         workload_id="contoso-demand-recovery",
@@ -237,6 +244,8 @@ def summary_sections() -> dict:
         workload_assessment={"assessment_status": "evidence_incomplete"},
         decision_gates={"eligible_actions": ["prove"]},
         portfolio_action={"selected_action": "prove"},
+        cost_snapshot=cost_snapshot,
+        cost_snapshot_path=cost_snapshot_path,
     )
 
 
@@ -362,3 +371,93 @@ def test_persist_run_package_writes_both_files(tmp_path):
     assert len(lines) == 1
     assert json.loads(lines[0])["interaction_id"] == "alpha"
     assert json.loads(summary_path.read_text(encoding="utf-8"))["run_id"] == "run1"
+
+
+@pytest.fixture
+def monthly_snapshot():
+    config_path = Path(__file__).resolve().parents[1] / "economics" / "azure_runtime_cost.yaml"
+    return build_cost_snapshot(azure_runtime_cost=summarize_azure_runtime_cost(
+        load_azure_runtime_cost_config(config_path)
+    ))
+
+
+def test_no_snapshot_leaves_run_summary_unchanged():
+    default = summary_sections()
+    assert default == summary_sections(cost_snapshot=None, cost_snapshot_path=None)
+    assert "azure_runtime_cost" not in default
+    assert "azure_runtime_modeled_economics" not in default
+
+
+@pytest.mark.parametrize("source_type", ["azure_cost_management_manual", "azure_cost_management_api"])
+def test_run_package_persists_compact_period_evidence(monthly_snapshot, tmp_path, source_type):
+    monthly_snapshot["evidence_source"]["type"] = source_type
+    path = tmp_path / "cost_snapshots" / f"{monthly_snapshot['snapshot_id']}.json"
+    save_cost_snapshot(monthly_snapshot, path)
+    summary = summary_sections(cost_snapshot=monthly_snapshot, cost_snapshot_path=path)
+    _, summary_path = persist_run_package("run1", build(), summary, base=tmp_path / "runs")
+    saved = json.loads(summary_path.read_text(encoding="utf-8"))
+    evidence = saved["azure_runtime_cost"]
+    for field in (
+        "snapshot_id", "workload_id", "cost_period", "created_at", "period_days",
+        "allocation_status", "evidence_source", "actual_selected_resource_cost_usd",
+        "allocated_azure_runtime_cost_usd", "allocated_azure_runtime_cost_per_day_usd",
+    ):
+        assert evidence[field] == monthly_snapshot[field]
+    assert evidence["snapshot_path"] == str(path)
+    assert "resource_allocations" not in evidence
+    assert evidence["snapshot_id"] != saved["run_id"]
+    assert not any("run_" in field for field in evidence)
+    assert "azure_runtime_modeled_economics" not in saved
+
+
+def test_summary_cost_evidence_is_detached_from_input(monthly_snapshot):
+    before = deepcopy(monthly_snapshot)
+    summary = summary_sections(cost_snapshot=monthly_snapshot)
+    assert monthly_snapshot == before
+    summary["azure_runtime_cost"]["cost_period"]["start"] = "changed"
+    summary["azure_runtime_cost"]["evidence_source"]["type"] = "changed"
+    assert monthly_snapshot == before
+
+
+@pytest.mark.parametrize("modeled", [
+    {},
+    {"recovered_contribution_per_month": 1701, "ai_value_multiple": 117.8},
+    {"recovered_contribution_per_month": 1701, "days_per_month": 12, "ai_value_multiple": 117.8},
+])
+def test_snapshot_does_not_invent_monthly_economics_or_customer_value(monthly_snapshot, modeled):
+    value = {
+        "customer_net_economic_value_usd": None,
+        "customer_cost_completeness": None,
+        "value_evidence_status": "modeled_only",
+    }
+    before_modeled = deepcopy(modeled)
+    before_value = deepcopy(value)
+    summary = build_run_summary(
+        run_id="run1", workload_id=monthly_snapshot["workload_id"],
+        execution_economics={}, modeled_business_economics=modeled, economic_value=value,
+        incremental_economics={}, value_resilience={}, workload_assessment={},
+        decision_gates={}, portfolio_action={}, cost_snapshot=monthly_snapshot,
+    )
+    assert summary["modeled_business_economics"] == before_modeled
+    assert summary["economic_value"] == before_value
+    assert modeled == before_modeled
+    assert value == before_value
+    assert "azure_runtime_modeled_economics" not in summary
+    assert not any("realized" in key or "roi" in key for key in summary["azure_runtime_cost"])
+
+
+def test_run_rejects_wrong_workload_snapshot(monthly_snapshot):
+    monthly_snapshot["workload_id"] = "other-workload"
+    with pytest.raises(ValueError, match="workload_id"):
+        summary_sections(cost_snapshot=monthly_snapshot)
+
+
+def test_run_rejects_invalid_snapshot(monthly_snapshot):
+    monthly_snapshot["allocated_azure_runtime_cost_usd"] = 999
+    with pytest.raises(ValueError, match="allocated_azure_runtime_cost_usd"):
+        summary_sections(cost_snapshot=monthly_snapshot)
+
+
+def test_snapshot_reference_requires_loaded_evidence(tmp_path):
+    with pytest.raises(ValueError, match="requires a loaded"):
+        summary_sections(cost_snapshot_path=tmp_path / "snapshot.json")

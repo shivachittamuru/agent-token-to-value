@@ -7,12 +7,28 @@ No Azure APIs or SDKs are used here.
 
 from __future__ import annotations
 
+import calendar
 from copy import deepcopy
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from math import fsum, isfinite
 from pathlib import Path
 
 import yaml
+
+
+def validate_completed_calendar_month(
+    *, start: date, end: date, today: date | None = None
+) -> None:
+    """Reject partial, current, and future months without any Azure dependency."""
+    for label, value in (("start", start), ("end", end)):
+        if not isinstance(value, date) or isinstance(value, datetime):
+            raise ValueError(f"{label} must be a date")
+    last_day = calendar.monthrange(start.year, start.month)[1]
+    if start.day != 1 or end != date(start.year, start.month, last_day):
+        raise ValueError("only a complete calendar month is supported")
+    current_date = today if today is not None else datetime.now(timezone.utc).date()
+    if end >= current_date.replace(day=1):
+        raise ValueError("only a completed calendar month is supported")
 
 
 def load_azure_runtime_cost_config(path: Path) -> dict:
