@@ -3,8 +3,9 @@
 Consolidates the per-interaction and run-level evidence produced by the domain
 modules into a single ``runs/<run_id>/`` package (``interactions.jsonl`` and
 ``summary.json``). This layer only reshapes and writes existing records; it
-never recalculates economics or decision logic, and it preserves Unknown as
-``null``.
+never recalculates supplied economics or decision logic, and it preserves
+Unknown as ``null``. A compatible cost snapshot can add a separate modeled
+runtime lens through the existing domain helper.
 """
 
 from __future__ import annotations
@@ -13,6 +14,9 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
+from foundry_prompt_agent.azure_runtime_cost import (
+    apply_azure_runtime_cost_to_modeled_economics,
+)
 from foundry_prompt_agent.cost_snapshot import validate_cost_snapshot
 
 RUNS_DIR = Path("runs")
@@ -178,11 +182,13 @@ def build_run_summary(
     synthetic_economics: dict | None = None,
     cost_snapshot: dict | None = None,
     cost_snapshot_path: Path | None = None,
+    modeled_business_days_per_month: int | None = None,
 ) -> dict:
     """Preserve run evidence and optionally reference monthly operating costs.
 
-    The current modeled scenario has no calendar-month economic basis, so this
-    layer never combines its numerator with a snapshot or recalculates economics.
+    Runtime economics require the explicitly supplied projection horizon used
+    to compute the monthly numerator to match the snapshot's calendar month.
+    Existing domain records are preserved; nothing is prorated.
     """
     if cost_snapshot_path is not None and cost_snapshot is None:
         raise ValueError("cost_snapshot_path requires a loaded cost_snapshot")
@@ -222,6 +228,23 @@ def build_run_summary(
         }
         if cost_snapshot_path is not None:
             summary["azure_runtime_cost"]["snapshot_path"] = str(cost_snapshot_path)
+        if (
+            isinstance(modeled_business_days_per_month, int)
+            and not isinstance(modeled_business_days_per_month, bool)
+            and modeled_business_days_per_month == cost_snapshot["period_days"]
+            and modeled_business_economics.get("recovered_contribution_per_month") is not None
+        ):
+            summary["azure_runtime_modeled_economics"] = (
+                apply_azure_runtime_cost_to_modeled_economics(
+                    modeled_business_economics=modeled_business_economics,
+                    azure_runtime_cost={
+                        "allocated_azure_runtime_cost_usd": cost_snapshot["allocated_azure_runtime_cost_usd"],
+                        "cost_period": cost_snapshot["cost_period"],
+                        "cost_source": cost_snapshot["evidence_source"],
+                        "allocation_status": cost_snapshot["allocation_status"],
+                    },
+                )
+            )
     return summary
 
 

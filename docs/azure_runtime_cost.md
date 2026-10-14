@@ -268,12 +268,30 @@ caused by that run. No run-level Azure cost or cost-per-run claim is created.
 Evaluation and simulation never retrieve live Cost Management data, and
 runs without a snapshot retain the existing summary shape.
 
-Runtime-adjusted modeled economics are deliberately not added to run
-summaries in this slice. The current business scenario lacks an explicit
-calendar-month economic basis; a monthly metric name or a 30-day projection
-does not establish compatibility with September billing. Cost evidence is
-retained without inventing or prorating a numerator. AI Value Multiple,
-Customer Net Economic Value, and decision/action logic remain unchanged.
+The runner passes the `days_per_month` it actually used for the modeled
+contribution to the summary builder as `modeled_business_days_per_month`.
+Runtime-adjusted modeled economics are added only when that explicit
+projection horizon matches the validated snapshot's completed calendar-month
+length and the modeled monthly contribution is available. The current 30-day
+scenario is compatible with September's 30-day cost snapshot. A 12-day scenario
+or a missing horizon is not; a 30-day scenario also does not silently become
+a 31-day scenario for October billing.
+
+Compatible runs persist a separate `azure_runtime_modeled_economics` section
+and print `=== Azure Runtime Economics ===`. The existing helper computes the
+runtime lens without adding inference cost to the Azure bill. Incompatible
+runs retain `azure_runtime_cost`, omit runtime-adjusted economics, and print
+an explanation. Nothing is invented or prorated. Runs without a snapshot
+do not print the Azure Runtime Economics section.
+
+Execution Economics continues to report run-level direct execution cost.
+Its console now calls Search, observability, and human recovery
+`Not attributed at run level`, and separately reports whether period-level
+Azure evidence is available via a snapshot. A monthly bill is never divided
+by evaluation interaction count or substituted for
+`known_direct_execution_cost_usd`. Full Execution Cost remains unestablished.
+AI Value Multiple, Customer Net Economic Value, and decision/action logic
+remain unchanged.
 
 Runtime cost still excludes human effort, governance, support, and other
 relevant customer costs. Persisting it does not turn it into Total Relevant
@@ -284,6 +302,25 @@ Customer Cost or establish complete customer-cost evidence.
 * Modeled AI Value Multiple = modeled recovered contribution / projected inference cost
 * Modeled Azure Runtime Value Multiple = modeled recovered contribution / allocated Azure runtime cost
 * Modeled contribution after Azure runtime = modeled recovered contribution - allocated Azure runtime cost
+
+### Economic ladder example
+
+For the current regression scenario, modeled recovered contribution is
+$1,701/month and projected inference cost is approximately $11.07:
+
+* Inference-only economics: Modeled AI Value Multiple is approximately 153.6x
+* Broader Azure operating economics: Modeled Azure Runtime Value Multiple is approximately 32.4x against $52.525882 allocated runtime cost
+* Complete customer economics: not yet established
+
+The lower runtime multiple is expected: its denominator includes Search,
+Foundry/model runtime, and observability rather than inference alone. It is a
+second lens, not a replacement for the inference-only multiple. Modeled
+contribution after allocated runtime cost is approximately $1,648.474118.
+Both multiples still use the original modeled contribution as their numerator.
+
+Human recovery, governance, support, and other relevant customer costs remain
+outside the evidence boundary. These outputs establish neither Customer Net
+Economic Value nor realized ROI or incremental economics.
 
 Using the current business assumptions and the documented illustrative run
 (90% success and $0.0074 per interaction), modeled recovered contribution is
@@ -303,6 +340,6 @@ does not establish complete customer-cost evidence.
 
 The numerator remains modeled. These outputs do not establish realized
 contribution, ROI, incremental economics, or Customer Net Economic Value.
-No FinOps Toolkit integration, dashboard changes, or changes to simulation
-economics are included. Runner integration only persists optional local
-period-level cost evidence.
+No FinOps Toolkit integration or dashboard changes are included. Both runners
+use the same optional local snapshot and monthly-basis guard; synthetic and
+incremental economics are unchanged.

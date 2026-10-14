@@ -13,6 +13,10 @@ from foundry_prompt_agent.azure_runtime_cost import (
     summarize_azure_runtime_cost,
 )
 from foundry_prompt_agent.cost_snapshot import build_cost_snapshot, save_cost_snapshot
+from foundry_prompt_agent.business_economics import (
+    load_business_assumptions,
+    summarize_business_economics,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -53,6 +57,10 @@ def runners(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "run_evaluation", evaluation)
     simulation = load_script("snapshot_simulation_runner", ROOT / "scripts" / "run_simulation.py")
 
+    evaluation._console_printers = {
+        name: function for name, function in vars(evaluation).items()
+        if name.startswith("print_")
+    }
     # Exercise the actual shared package pipeline; mock unrelated domain evidence.
     outputs = {
         "summarize_effectiveness": {},
@@ -79,7 +87,7 @@ def runners(monkeypatch, tmp_path):
     for name, value in outputs.items():
         monkeypatch.setattr(evaluation, name, lambda *args, result=value, **kwargs: deepcopy(result))
     for name in vars(evaluation):
-        if name.startswith("print_"):
+        if name.startswith("print_") and name != "print_azure_runtime_economics":
             monkeypatch.setattr(evaluation, name, lambda *args, **kwargs: None)
     monkeypatch.setattr(evaluation, "apply_acceptance", lambda records, rows: records)
     monkeypatch.setattr(evaluation, "ASSUMPTIONS_PATH", ROOT / "economics" / "business_assumptions.yaml")
@@ -127,13 +135,122 @@ def test_runners_persist_optional_local_snapshot(
     assert summary["run_mode"] == ("regression" if runner_name == "evaluation" else "simulation")
     assert summary["modeled_business_economics"]["ai_value_multiple"] == 117.8
     assert summary["economic_value"]["customer_net_economic_value_usd"] is None
-    assert "azure_runtime_modeled_economics" not in summary
     if include_snapshot:
         assert summary["azure_runtime_cost"]["snapshot_id"] == snapshot["snapshot_id"]
         assert summary["azure_runtime_cost"]["snapshot_path"] == str(path)
         assert summary["azure_runtime_cost"]["allocated_azure_runtime_cost_usd"] == pytest.approx(52.524)
+        assert summary["azure_runtime_modeled_economics"]["modeled_azure_runtime_value_multiple"] == pytest.approx(1701 / 52.524)
     else:
         assert "azure_runtime_cost" not in summary
+        assert "azure_runtime_modeled_economics" not in summary
+
+
+@pytest.fixture
+def live_saved_snapshot(tmp_path):
+    config = load_azure_runtime_cost_config(ROOT / "economics" / "azure_runtime_cost.yaml")
+    config["source"]["type"] = "azure_cost_management_api"
+    for index, amount in enumerate([241.92, 4.123483, 0.018399, 0]):
+        config["resources"][index]["actual_cost_usd"] = amount
+        config["resources"][index]["cost_evidence_status"] = (
+            "no_direct_charge_returned" if index == 3 else "observed_billing"
+        )
+    snapshot = build_cost_snapshot(azure_runtime_cost=summarize_azure_runtime_cost(config))
+    path = tmp_path / "live-september.json"
+    save_cost_snapshot(snapshot, path)
+    return path, snapshot
+
+
+@pytest.mark.parametrize("runner_name", ["evaluation", "simulation"])
+@pytest.mark.parametrize("compatible", [False, True])
+def test_runtime_console_and_persistence_follow_basis(
+    runners, live_saved_snapshot, tmp_path, monkeypatch, capsys, runner_name, compatible
+):
+    evaluation = runners["evaluation"]
+    path, snapshot = live_saved_snapshot
+    assumptions = load_business_assumptions(ROOT / "economics" / "business_assumptions.yaml")
+    assumptions["days_per_month"] = 30 if compatible else 12
+    business = summarize_business_economics(
+        **assumptions, success_rate=0.9, cost_per_task_usd=0.0061518
+    )
+    monkeypatch.setattr(evaluation, "load_business_assumptions", lambda *args: assumptions)
+    monkeypatch.setattr(evaluation, "summarize_business_economics", lambda **kwargs: business)
+    execution = {
+        "attempted_interactions": 10, "accepted_interactions": 9,
+        "known_direct_execution_cost_usd": 0.061518,
+        "known_direct_cost_per_attempt_usd": 0.0061518,
+        "known_direct_cost_per_accepted_work_usd": 0.061518 / 9,
+        "measured_tool_calls": 10, "cost_completeness": "partial",
+        "unknown_or_unallocated_components": ["azure_ai_search", "observability", "human_recovery"],
+    }
+    monkeypatch.setattr(evaluation, "summarize_execution_economics", lambda *args: execution)
+    for name in ("print_execution_economics", "print_business_economics"):
+        monkeypatch.setattr(evaluation, name, evaluation._console_printers[name])
+    monkeypatch.setattr(sys, "argv", [runner_name, "--cost-snapshot", str(path)])
+    runners[runner_name].main()
+    output = capsys.readouterr().out
+    assert "Modeled AI Value Multiple: 153.6x" in output
+    expected_inference_cost = "$11.07" if compatible else "$4.43"
+    assert f"AI inference cost/month: {expected_inference_cost}" in output
+    assert "Not attributed at run level:" in output
+    assert "  - azure_ai_search" in output
+    assert "  - observability" in output
+    assert "  - human_recovery" in output
+    assert "AVAILABLE VIA COST SNAPSHOT" in output
+    assert "Full Execution Cost: NOT YET ESTABLISHED" in output
+    summary = json.loads(
+        (tmp_path / "runs" / "snapshot-test-run" / "summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["execution_economics"] == execution
+    assert summary["modeled_business_economics"] == business
+    assert summary["economic_value"]["customer_net_economic_value_usd"] is None
+    assert summary["portfolio_action"]["selected_action"] == "prove"
+    assert summary["azure_runtime_cost"]["cost_period"] == snapshot["cost_period"]
+    if compatible:
+        assert "=== Azure Runtime Economics ===" in output
+        assert "Cost period: 2026-09-01 to 2026-09-30" in output
+        assert "Actual selected Azure resource cost: $246.06" in output
+        assert "Allocated Azure runtime cost: $52.53" in output
+        assert "Allocation status: PARTIALLY ALLOCATED" in output
+        assert "Modeled recovered contribution/month: $1,701.00" in output
+        assert "Modeled contribution after Azure runtime: $1,648.47" in output
+        assert "Modeled Azure Runtime Value Multiple: 32.4x" in output
+        assert "Evidence boundary: PERIOD-LEVEL AZURE OPERATING COST" in output
+        assert summary["azure_runtime_modeled_economics"]["modeled_azure_runtime_value_multiple"] == pytest.approx(1701 / 52.525882)
+    else:
+        assert "=== Azure Runtime Economics ===" not in output
+        assert "monthly basis not established or incompatible" in output
+        assert "azure_runtime_modeled_economics" not in summary
+
+
+def test_no_snapshot_console_keeps_runtime_section_absent(runners, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["evaluation"])
+    runners["evaluation"].main()
+    output = capsys.readouterr().out
+    assert "=== Azure Runtime Economics ===" not in output
+    summary = json.loads(
+        (tmp_path / "runs" / "snapshot-test-run" / "summary.json").read_text(encoding="utf-8")
+    )
+    assert "azure_runtime_cost" not in summary
+    assert "azure_runtime_modeled_economics" not in summary
+
+
+def test_execution_console_without_snapshot_clarifies_boundary(runners, capsys):
+    evaluation = runners["evaluation"]
+    execution = {
+        "attempted_interactions": 1, "accepted_interactions": 1,
+        "known_direct_execution_cost_usd": 0.01,
+        "known_direct_cost_per_attempt_usd": 0.01,
+        "known_direct_cost_per_accepted_work_usd": 0.01,
+        "measured_tool_calls": 1, "cost_completeness": "partial",
+        "unknown_or_unallocated_components": ["azure_ai_search", "observability", "human_recovery"],
+    }
+    before = deepcopy(execution)
+    evaluation._console_printers["print_execution_economics"](execution)
+    output = capsys.readouterr().out
+    assert "NOT PROVIDED" in output
+    assert "Full Execution Cost: NOT YET ESTABLISHED" in output
+    assert "Known direct execution cost: $0.010000" in output
+    assert execution == before
 
 
 @pytest.mark.parametrize("runner_name", ["evaluation", "simulation"])

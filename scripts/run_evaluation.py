@@ -163,7 +163,9 @@ def print_execution_evidence(records: list[dict]) -> None:
     )
 
 
-def print_execution_economics(summary: dict) -> None:
+def print_execution_economics(
+    summary: dict, *, period_cost_evidence_available: bool = False
+) -> None:
     print("\n=== Execution Economics ===")
     print(f"Attempted interactions: {summary['attempted_interactions']}")
     print(f"Accepted work units: {summary['accepted_interactions']}")
@@ -182,8 +184,16 @@ def print_execution_economics(summary: dict) -> None:
     print(f"Measured tool calls: {summary['measured_tool_calls']}")
     print(f"Cost completeness: {summary['cost_completeness'].upper()}")
 
-    unknown = ", ".join(summary["unknown_or_unallocated_components"]) or "none"
-    print(f"Unknown / unallocated: {unknown}")
+    print("Not attributed at run level:")
+    for component in summary["unknown_or_unallocated_components"]:
+        print(f"  - {component}")
+    if not summary["unknown_or_unallocated_components"]:
+        print("  - none")
+    print("Period-level Azure operating-cost evidence:")
+    print(
+        "  AVAILABLE VIA COST SNAPSHOT"
+        if period_cost_evidence_available else "  NOT PROVIDED"
+    )
 
     if summary["cost_completeness"] == "partial":
         print("Full Execution Cost: NOT YET ESTABLISHED")
@@ -511,7 +521,7 @@ def print_business_economics(summary: dict) -> None:
     )
 
     print(
-        f"AI Value Multiple: "
+        f"Modeled AI Value Multiple: "
         f"{summary['ai_value_multiple']:,.1f}x"
     )
 
@@ -611,7 +621,10 @@ def process_completed_run(
         execution_economics = summarize_execution_economics(
             execution_records, attributions
         )
-        print_execution_economics(execution_economics)
+        print_execution_economics(
+            execution_economics,
+            period_cost_evidence_available=cost_snapshot is not None,
+        )
 
         # 4e/4f. Simulated pilot assignment + synthetic outcomes (simulation
         # only). Regression keeps pilot/business evidence Unknown.
@@ -804,7 +817,19 @@ def process_completed_run(
             synthetic_economics=synthetic_economics_record,
             cost_snapshot=cost_snapshot,
             cost_snapshot_path=cost_snapshot_path,
+            modeled_business_days_per_month=assumptions["days_per_month"],
         )
+        runtime_economics = run_summary.get("azure_runtime_modeled_economics")
+        if runtime_economics is not None:
+            print_azure_runtime_economics(
+                cost_evidence=run_summary["azure_runtime_cost"],
+                modeled_economics=runtime_economics,
+            )
+        elif cost_snapshot is not None:
+            print(
+                "\nAzure runtime modeled economics: NOT COMPUTED "
+                "(monthly basis not established or incompatible)"
+            )
         interactions_path, summary_path = persist_run_package(
             run_id, interaction_records, run_summary
         )
@@ -830,6 +855,39 @@ def process_completed_run(
             )
 
             print(f"\nAppended tokenomics run to {history.HISTORY_PATH}")
+
+
+def print_azure_runtime_economics(
+    *, cost_evidence: dict, modeled_economics: dict
+) -> None:
+    print("\n=== Azure Runtime Economics ===")
+    period = cost_evidence["cost_period"]
+    print(f"Cost period: {period['start']} to {period['end']}")
+    print(
+        f"Actual selected Azure resource cost: "
+        f"${cost_evidence['actual_selected_resource_cost_usd']:,.2f}"
+    )
+    print(
+        f"Allocated Azure runtime cost: "
+        f"${cost_evidence['allocated_azure_runtime_cost_usd']:,.2f}"
+    )
+    print(
+        f"Allocation status: "
+        f"{cost_evidence['allocation_status'].replace('_', ' ').upper()}"
+    )
+    print(
+        f"\nModeled recovered contribution/month: "
+        f"${modeled_economics['modeled_recovered_contribution_usd']:,.2f}"
+    )
+    print(
+        f"Modeled contribution after Azure runtime: "
+        f"${modeled_economics['modeled_contribution_after_azure_runtime_usd']:,.2f}"
+    )
+    print(
+        f"Modeled Azure Runtime Value Multiple: "
+        f"{modeled_economics['modeled_azure_runtime_value_multiple']:,.1f}x"
+    )
+    print("\nEvidence boundary: PERIOD-LEVEL AZURE OPERATING COST")
 
 
 def main() -> None:
