@@ -46,6 +46,8 @@ economics path. This proves the adapter pattern, not full multi-cloud support.
 
 ## Dashboards
 
+* **AI Value Pulse** is the recommended starting dashboard. It presents the
+  workflow from work through evidence, value, and next action in one compact view.
 * **Token-to-Value** measures technical performance and Accepted Work, then
   models business economics. A compatible cost snapshot makes system
   economics primary; the inference-only metric remains diagnostic.
@@ -79,9 +81,10 @@ Run with a local Azure runtime cost snapshot:
 uv run python scripts\run_evaluation.py --cost-snapshot cost_snapshots\contoso-demand-recovery-2026-09.json
 ```
 
-Open either dashboard:
+Open the recommended starting dashboard or a detailed view:
 
 ```powershell
+uv run streamlit run apps\value_pulse_dashboard.py
 uv run streamlit run apps\dashboard.py
 uv run streamlit run apps\value_to_action_dashboard.py
 ```

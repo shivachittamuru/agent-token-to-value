@@ -9,6 +9,9 @@ fabricated scope.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+from math import isfinite
+
 from foundry_prompt_agent.azure_runtime_cost import (
     apply_azure_runtime_cost_to_modeled_economics,
 )
@@ -16,6 +19,12 @@ from foundry_prompt_agent.azure_runtime_cost import (
 UNAVAILABLE = "—"
 
 JOURNEY_STAGES = ("MEASURE", "PROVE", "VALUE", "TEST", "DECIDE", "ACT")
+VALUE_PULSE_OBJECTIVE = (
+    "Recover customer demand the business cannot currently serve."
+)
+VALUE_PULSE_ACCEPTED_WORK = (
+    "Task success plus mandatory quality and control floors."
+)
 
 
 def _upper(value) -> str:
@@ -344,6 +353,286 @@ def act_view(summary: dict) -> dict:
         "required_evidence": action.get("required_evidence") or [],
         "resource_request": action.get("resource_request"),
         "reassessment_trigger": action.get("reassessment_trigger"),
+    }
+
+
+def build_value_pulse_view(summary: dict, interactions: list[dict]) -> dict:
+    """Compose existing run evidence into the compact Value Pulse stages."""
+
+    workload_id = summary.get("workload_id")
+    workload_name = summary.get("workload_name") or (
+        str(workload_id).replace("-", " ").title()
+        if workload_id
+        else UNAVAILABLE
+    )
+    runtime_cost_record = summary.get("azure_runtime_cost") or {}
+    runtime_workload_matches = (
+        bool(runtime_cost_record)
+        and runtime_cost_record.get("workload_id") == workload_id
+    )
+    runtime_cost = (
+        runtime_cost_record if runtime_workload_matches else {}
+    )
+    cost_period = runtime_cost.get("cost_period")
+    period_label = UNAVAILABLE
+    if cost_period:
+        try:
+            period_start = date.fromisoformat(cost_period["start"])
+            period_label = period_start.strftime("%b %Y")
+        except (KeyError, TypeError, ValueError):
+            period_label = UNAVAILABLE
+    elif summary.get("run_id"):
+        try:
+            run_date = datetime.strptime(
+                str(summary["run_id"])[:8], "%Y%m%d"
+            ).date()
+            period_label = run_date.strftime("%b %d, %Y")
+        except (TypeError, ValueError):
+            period_label = str(summary["run_id"])
+
+    measure = measure_metrics(summary, interactions)
+    attempted = measure["attempted_interactions"]
+    accepted_count = (
+        measure["accepted_interactions"] if attempted else None
+    )
+    accepted_rate = measure["acceptance_rate"] if attempted else None
+    direct_cost_per_accepted_work = measure[
+        "known_direct_cost_per_accepted_work_usd"
+    ]
+    if (
+        accepted_count is None
+        or accepted_count <= 0
+        or isinstance(direct_cost_per_accepted_work, bool)
+        or not isinstance(direct_cost_per_accepted_work, (int, float))
+        or not isfinite(direct_cost_per_accepted_work)
+    ):
+        direct_cost_per_accepted_work = None
+
+    value = value_view(summary)
+    runtime_value = value["azure_runtime"]
+    runtime_economics_available = bool(
+        runtime_workload_matches
+        and runtime_value
+        and runtime_value["available"]
+    )
+    if runtime_economics_available:
+        economic_value_label = "Modeled contribution after Azure runtime"
+        economic_value_amount = runtime_value[
+            "modeled_contribution_after_azure_runtime_usd"
+        ]
+        value_multiple_label = "Modeled Azure Runtime Value Multiple"
+        value_multiple = runtime_value["modeled_azure_runtime_value_multiple"]
+        value_evidence_type = "MODELED"
+    else:
+        economic_value_label = "Modeled recovered contribution"
+        economic_value_amount = value["modeled"]["recovered_contribution_usd"]
+        value_multiple_label = "Modeled AI Value Multiple (inference-only)"
+        value_multiple = value["modeled"]["ai_value_multiple"]
+        value_evidence_type = (
+            "MODELED" if economic_value_amount is not None else "UNKNOWN"
+        )
+
+    assessment = summary.get("workload_assessment") or {}
+    evidence_scope = str(assessment.get("business_evidence_scope") or "").lower()
+    observed_outcomes = []
+    simulated_outcomes = []
+    for record in interactions:
+        outcome = record.get("business_outcome") or {}
+        source = outcome.get("outcome_evidence_source")
+        has_outcome = source is not None or any(
+            outcome.get(field) is not None
+            for field in (
+                "customer_engaged_after_response",
+                "order_completed",
+                "order_value_usd",
+                "incremental_order",
+            )
+        )
+        if not has_outcome:
+            continue
+        if source == "synthetic_simulation" or record.get("run_mode") == "simulation":
+            simulated_outcomes.append(outcome)
+        else:
+            observed_outcomes.append(outcome)
+
+    experiment = summary.get("synthetic_experiment") or {}
+    synthetic_economics = summary.get("synthetic_economics") or {}
+    if (
+        summary.get("run_mode") == "simulation"
+        or evidence_scope == "simulation"
+        or experiment
+        or simulated_outcomes
+    ):
+        outcome = {
+            "evidence_type": "SIMULATED",
+            "primary_metric_label": "Synthetic conversion lift",
+            "primary_metric_value": experiment.get(
+                "simulated_conversion_lift_pp"
+            ),
+            "primary_metric_unit": "percentage points",
+            "magnitude_label": "Simulated incremental orders (sample)",
+            "magnitude_value": synthetic_economics.get(
+                "simulated_incremental_orders_for_observed_sample"
+            ),
+            "magnitude_unit": "orders",
+            "production_status": "Not established",
+        }
+    elif observed_outcomes or (
+        assessment.get("business_outcome_status") == "observed"
+        and evidence_scope != "simulation"
+    ):
+        observed_orders = [
+            item
+            for item in observed_outcomes
+            if item.get("order_completed") is not None
+        ]
+        observed_order_values = [
+            item["order_value_usd"]
+            for item in observed_outcomes
+            if isinstance(item.get("order_value_usd"), (int, float))
+            and not isinstance(item.get("order_value_usd"), bool)
+        ]
+        if observed_orders:
+            outcome_metric_label = "Observed completed orders"
+            outcome_metric_value = sum(
+                item["order_completed"] is True for item in observed_orders
+            )
+            outcome_metric_unit = "orders"
+        else:
+            outcome_metric_label = "Observed business outcome evidence"
+            outcome_metric_value = None
+            outcome_metric_unit = None
+        outcome = {
+            "evidence_type": "OBSERVED",
+            "primary_metric_label": outcome_metric_label,
+            "primary_metric_value": outcome_metric_value,
+            "primary_metric_unit": outcome_metric_unit,
+            "magnitude_label": "Observed order value",
+            "magnitude_value": (
+                sum(observed_order_values) if observed_order_values else None
+            ),
+            "magnitude_unit": "USD",
+            "production_status": "Evidence available",
+        }
+    else:
+        modeled_economics = summary.get("modeled_business_economics") or {}
+        modeled_orders = modeled_economics.get("recovered_orders_per_month")
+        if modeled_orders is not None:
+            outcome = {
+                "evidence_type": "MODELED",
+                "primary_metric_label": "Modeled recovered orders / month",
+                "primary_metric_value": modeled_orders,
+                "primary_metric_unit": "orders",
+                "magnitude_label": "Modeled recovered contribution / month",
+                "magnitude_value": value["modeled"][
+                    "recovered_contribution_usd"
+                ],
+                "magnitude_unit": "USD",
+                "production_status": "Not observed",
+            }
+        else:
+            outcome = {
+                "evidence_type": "UNKNOWN",
+                "primary_metric_label": "Business outcome",
+                "primary_metric_value": None,
+                "primary_metric_unit": None,
+                "magnitude_label": "Outcome magnitude",
+                "magnitude_value": None,
+                "magnitude_unit": None,
+                "production_status": "Not available",
+            }
+
+    confidence = (
+        summary.get("evidence_confidence")
+        or assessment.get("evidence_confidence")
+        or "UNKNOWN"
+    )
+    confidence = str(confidence).replace("_", " ").upper()
+    if confidence not in {"HIGH", "MEDIUM", "LOW", "UNKNOWN"}:
+        confidence = "UNKNOWN"
+
+    action = act_view(summary)
+    required_evidence = action["required_evidence"]
+    required_work = action["required_work"]
+    next_step = (
+        required_evidence[0]
+        if required_evidence
+        else required_work[0]
+        if required_work
+        else None
+    )
+    customer_net_value = value["decision_grade"][
+        "customer_net_economic_value_usd"
+    ]
+    customer_cost_completeness = (
+        (summary.get("economic_value") or {}).get("customer_cost_completeness")
+    )
+    incremental_economics_status = (
+        (summary.get("incremental_economics") or {}).get("economics_status")
+    )
+    customer_economics_status = (
+        "Established"
+        if customer_net_value is not None
+        and customer_cost_completeness == "complete"
+        and incremental_economics_status == "incremental_net_value_established"
+        else "Not established"
+    )
+    cost_evidence_source = runtime_cost.get("evidence_source") or {}
+    cost_evidence_status = str(
+        cost_evidence_source.get("evidence_status") or "unknown"
+    ).replace("_", " ").upper()
+    business_value_status = (
+        "MODELED" if value_evidence_type == "MODELED" else "UNKNOWN"
+    )
+
+    return {
+        "context": {
+            "workload": workload_name,
+            "run_id": summary.get("run_id") or UNAVAILABLE,
+            "period": period_label,
+            "evidence_status": (
+                f"Azure cost {cost_evidence_status} · "
+                f"Business value {business_value_status} · "
+                f"Outcome {outcome['evidence_type']}"
+            ),
+            "customer_economics_status": customer_economics_status,
+        },
+        "work": {
+            "workload": workload_name,
+            "objective": summary.get("business_objective")
+            or VALUE_PULSE_OBJECTIVE,
+            "accepted_work_definition": VALUE_PULSE_ACCEPTED_WORK,
+        },
+        "measure": {
+            "accepted_work_count": accepted_count,
+            "accepted_work_rate": accepted_rate,
+            "system_cost_usd": runtime_cost.get(
+                "allocated_azure_runtime_cost_usd"
+            ),
+            "system_cost_period": period_label,
+            "system_cost_evidence": cost_evidence_status,
+            "cost_per_accepted_work_usd": direct_cost_per_accepted_work,
+            "cost_per_accepted_work_basis": (
+                "Run inference cost"
+                if direct_cost_per_accepted_work is not None
+                else "Not established"
+            ),
+        },
+        "outcome": outcome,
+        "value": {
+            "economic_value_label": economic_value_label,
+            "economic_value_usd": economic_value_amount,
+            "value_multiple_label": value_multiple_label,
+            "value_multiple": value_multiple,
+            "value_evidence_type": value_evidence_type,
+            "evidence_confidence": confidence,
+            "customer_economics_status": customer_economics_status,
+        },
+        "action": {
+            "selected_action": action["selected_action"],
+            "rationale": action["action_rationale"],
+            "next_step": next_step,
+        },
     }
 
 
