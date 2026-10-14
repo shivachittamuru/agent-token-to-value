@@ -1,9 +1,14 @@
-# Economic Reasoning Principles
+---
+title: Economic Reasoning Principles
+description: Concise rules for interpreting AI evidence, economics, and action.
+---
+
+## Economic Reasoning Principles
 
 Fifteen reusable rules behind the Value-to-Action framework.
 
 ## 1. The model is not the system
-`Model Cost → Full Execution Cost → Total Relevant Customer Cost`
+`Inference Cost → Azure Runtime Cost → Full Technical Execution Cost → Total Relevant Customer Cost`
 
 ## 2. A response is not Accepted Work
 Count useful work only after task success and mandatory quality/control floors are satisfied. Failed work still consumes resources.

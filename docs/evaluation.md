@@ -1,4 +1,12 @@
-# Evaluation in Microsoft Foundry
+---
+title: Evaluation in Microsoft Foundry
+description: Implementation reference for evaluation datasets, evaluators, and regression workflows.
+---
+
+## Evaluation in Microsoft Foundry
+
+> Implementation reference. See the [README](../README.md) and
+> [architecture overview](architecture.md) for the current framework.
 
 ## Purpose
 

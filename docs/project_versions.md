@@ -1,32 +1,33 @@
-# Project Versions and Development Branches
+---
+title: Project Milestones
+description: Major capability milestones in the Agent Token-to-Value repository.
+---
 
-The repository grows in layers: **Agent Quality → Token-to-Value → Value-to-Action**. Each checkpoint preserves the previous one rather than replacing it.
+## Agent Quality
 
-## `token-to-value-v1`
+Established the Foundry Prompt Agent evaluation flow, curated regression
+datasets, custom evaluators, and quality gates.
 
-The original Token-to-Value implementation:
+## Token-to-Value
 
-- Foundry Prompt Agent evaluation flow
-- token-cost and token-effectiveness economics
-- business-economics model
-- original Streamlit tokenomics dashboard ([apps/dashboard.py](../apps/dashboard.py))
-- reports, tests, and CI evaluation workflow
+Added token and inference-cost measurement, Accepted Work, and modeled Contoso
+business economics.
 
-```bash
-git checkout token-to-value-v1
+## Value-to-Action
+
+Added run-centric evidence packages, explicit measured/modeled/simulated
+states, pilot and incrementality contracts, decision gates, portfolio actions,
+and the Value-to-Action dashboard.
+
+## System Economics / FinOps Integration
+
+Added Azure Cost Management ingestion, an explicit workload resource
+allow-list, shared-resource allocation, period cost snapshots, a separate
+Modeled Azure Runtime Value Multiple, dashboard support, and a FOCUS cost
+adapter.
+
+The architectural outcome is:
+
+```text
+Cost source → normalized evidence → centralized allocation → system economics
 ```
-
-## `value-to-action-v1`
-
-The tag intended after `feature/value-to-action` is merged to main. It extends — does not redefine — Token-to-Value with:
-
-- Accepted Work (task success + mandatory guardrails)
-- run-centric evidence package (`runs/<run_id>/`)
-- the Value-to-Action methodology (MEASURE → PROVE → VALUE → TEST → DECIDE → ACT)
-- simulation mode with explicit synthetic provenance
-- synthetic experiment and synthetic population economics
-- the Value-to-Action dashboard ([apps/value_to_action_dashboard.py](../apps/value_to_action_dashboard.py))
-
-## Next branch
-
-The next intended development branch is **`feature/finops-cost-integration`**. It will extend technical/runtime **cost coverage** (broader Azure runtime cost evidence) rather than redefine the Value-to-Action methodology. It is not yet implemented.

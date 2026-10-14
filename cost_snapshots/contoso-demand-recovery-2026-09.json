@@ -1,0 +1,70 @@
+{
+  "actual_selected_resource_cost_usd": 246.06188160724,
+  "allocated_azure_runtime_cost_per_day_usd": 1.7508627202413334,
+  "allocated_azure_runtime_cost_usd": 52.52588160724,
+  "allocation_status": "partially_allocated",
+  "cost_period": {
+    "currency": "USD",
+    "end": "2026-09-30",
+    "start": "2026-09-01"
+  },
+  "created_at": "2026-10-13T23:27:13.549769+00:00",
+  "evidence_source": {
+    "cost_basis": "actual_cost",
+    "evidence_status": "observed_billing",
+    "scope": "/subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24",
+    "type": "azure_cost_management_api"
+  },
+  "period_days": 30,
+  "resource_allocations": [
+    {
+      "actual_cost_usd": 241.92,
+      "allocated_cost_usd": 48.384,
+      "allocation_basis": "engineering_estimate",
+      "allocation_confidence": "approximate",
+      "allocation_method": "fixed_percentage",
+      "allocation_percentage": 0.2,
+      "allocation_reason": "Search service is shared across workloads and historical per-index query logs were unavailable for September.",
+      "billing_expectation": "direct_charge_expected",
+      "cost_evidence_status": "observed_billing",
+      "name": "search-n6tesxjlv4jjk",
+      "resource_id": "/subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/CognitiveGroup/providers/Microsoft.Search/searchServices/search-n6tesxjlv4jjk",
+      "service": "azure_ai_search"
+    },
+    {
+      "actual_cost_usd": 4.123482967,
+      "allocated_cost_usd": 4.123482967,
+      "allocation_method": "direct",
+      "allocation_percentage": 1.0,
+      "billing_expectation": "direct_charge_expected",
+      "cost_evidence_status": "observed_billing",
+      "name": "rag-prompt-agent-resource",
+      "resource_id": "/subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.CognitiveServices/accounts/rag-prompt-agent-resource",
+      "service": "foundry_model_runtime"
+    },
+    {
+      "actual_cost_usd": 0.01839864024,
+      "allocated_cost_usd": 0.01839864024,
+      "allocation_method": "direct",
+      "allocation_percentage": 1.0,
+      "billing_expectation": "direct_charge_expected",
+      "cost_evidence_status": "observed_billing",
+      "name": "rag-prompt-agent-resource-logs",
+      "resource_id": "/subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.OperationalInsights/workspaces/rag-prompt-agent-resource-logs",
+      "service": "log_analytics"
+    },
+    {
+      "actual_cost_usd": 0.0,
+      "allocated_cost_usd": 0.0,
+      "allocation_method": "direct",
+      "allocation_percentage": 1.0,
+      "billing_expectation": "may_be_billed_elsewhere",
+      "cost_evidence_status": "no_direct_charge_returned",
+      "name": "rag-prompt-agent-resource-appinsights",
+      "resource_id": "/subscriptions/1fad602f-d06f-46af-8f70-78a2c2c53b24/resourceGroups/rg-enterprise-agents-on-foundry-dev/providers/Microsoft.Insights/components/rag-prompt-agent-resource-appinsights",
+      "service": "application_insights"
+    }
+  ],
+  "snapshot_id": "contoso-demand-recovery-2026-09",
+  "workload_id": "contoso-demand-recovery"
+}

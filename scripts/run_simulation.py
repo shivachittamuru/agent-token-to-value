@@ -35,6 +35,8 @@ from run_evaluation import (  # noqa: E402
 
 from foundry_prompt_agent.agent import project_client  # noqa: E402
 from foundry_prompt_agent.foundry_eval import run_cloud_evaluation  # noqa: E402
+from foundry_prompt_agent.cost_snapshot import load_cost_snapshot  # noqa: E402
+from foundry_prompt_agent.execution import WORKLOAD_ID  # noqa: E402
 from foundry_prompt_agent.synthetic_inquiries import (  # noqa: E402
     GENERATOR_VERSION,
     generate_inquiries,
@@ -54,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--outcome-seed", type=int, default=4201)
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--menu", type=Path, default=MENU_PATH)
+    parser.add_argument("--cost-snapshot", type=Path, help="Prepared monthly cost evidence (no billing API calls)")
     return parser.parse_args()
 
 
@@ -72,6 +75,10 @@ def print_synthetic_header(seed: int, cases: list[dict]) -> None:
 
 def main() -> None:
     args = parse_args()
+    cost_snapshot = (
+        load_cost_snapshot(args.cost_snapshot, workload_id=WORKLOAD_ID)
+        if args.cost_snapshot is not None else None
+    )
     judge_model = os.environ["FOUNDRY_JUDGE_MODEL"]
 
     run_id = build_run_id()
@@ -122,6 +129,8 @@ def main() -> None:
         run_mode="simulation",
         simulation_metadata=simulation_metadata,
         pilot_simulator=pilot_simulator,
+        cost_snapshot=cost_snapshot,
+        cost_snapshot_path=args.cost_snapshot,
     )
 
 

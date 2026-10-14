@@ -1,12 +1,17 @@
 """Pure presentation helpers for the Value-to-Action dashboard.
 
-These functions only map already-stored run-package fields into display-ready
-structures. They never recalculate economics or decision logic, never call the
-agent/Azure/Foundry, and never invent values: missing optional fields render as
-Unknown / unavailable, and Unknown statuses do not get a fabricated scope.
+These functions map stored run-package fields into display-ready structures.
+The scenario helper delegates runtime-economics arithmetic to the established
+pure helper. No function calls the agent/Azure/Foundry or invents values:
+missing optional fields remain unavailable, and Unknown statuses do not get a
+fabricated scope.
 """
 
 from __future__ import annotations
+
+from foundry_prompt_agent.azure_runtime_cost import (
+    apply_azure_runtime_cost_to_modeled_economics,
+)
 
 UNAVAILABLE = "—"
 
@@ -123,11 +128,13 @@ def prove_view(summary: dict) -> dict | None:
 
 
 def value_view(summary: dict) -> dict:
-    """Three separate value layers; synthetic never feeds decision-grade."""
+    """Map stored economics to separate model, system, and customer layers."""
 
     modeled_economics = summary.get("modeled_business_economics") or {}
     economic_value = summary.get("economic_value") or {}
     synthetic = summary.get("synthetic_economics")
+    runtime_cost = summary.get("azure_runtime_cost")
+    runtime_modeled = summary.get("azure_runtime_modeled_economics")
 
     incremental = summary.get("incremental_economics") or {}
     incremental_established = (
@@ -135,14 +142,45 @@ def value_view(summary: dict) -> dict:
         == "incremental_net_value_established"
     )
 
+    azure_runtime = None
+    if runtime_cost is not None or runtime_modeled is not None:
+        runtime_cost = runtime_cost or {}
+        runtime_modeled = runtime_modeled or {}
+        azure_runtime = {
+            "available": bool(runtime_cost and runtime_modeled),
+            "actual_selected_resource_cost_usd": runtime_cost.get(
+                "actual_selected_resource_cost_usd"
+            ),
+            "allocated_azure_runtime_cost_usd": runtime_cost.get(
+                "allocated_azure_runtime_cost_usd",
+                runtime_modeled.get("allocated_azure_runtime_cost_usd"),
+            ),
+            "modeled_contribution_after_azure_runtime_usd": runtime_modeled.get(
+                "modeled_contribution_after_azure_runtime_usd"
+            ),
+            "modeled_azure_runtime_value_multiple": runtime_modeled.get(
+                "modeled_azure_runtime_value_multiple"
+            ),
+            "allocation_status": runtime_cost.get(
+                "allocation_status", runtime_modeled.get("allocation_status")
+            ),
+            "cost_period": runtime_cost.get(
+                "cost_period", runtime_modeled.get("cost_period")
+            ),
+        }
+
     return {
         "modeled": {
             "recovered_contribution_usd": modeled_economics.get(
                 "recovered_contribution_per_month"
             ),
+            "inference_cost_usd": modeled_economics.get(
+                "ai_inference_cost_per_month"
+            ),
             "ai_value_multiple": modeled_economics.get("ai_value_multiple"),
             "cost_completeness": economic_value.get("cost_completeness"),
         },
+        "azure_runtime": azure_runtime,
         "synthetic": dict(synthetic) if synthetic else None,
         "decision_grade": {
             "customer_net_economic_value_usd": economic_value.get(
@@ -156,6 +194,35 @@ def value_view(summary: dict) -> dict:
             ),
         },
     }
+
+
+def scenario_runtime_economics(
+    *,
+    modeled_business_economics: dict,
+    cost_snapshot: dict,
+    workload_id: str,
+    modeled_days_per_month: int,
+) -> dict | None:
+    """Calculate a scenario's system lens against a fixed validated month.
+
+    Returns None when workload or modeled period does not match the snapshot.
+    All arithmetic is delegated to the established runtime economics helper.
+    """
+    if cost_snapshot.get("workload_id") != workload_id:
+        return None
+    if cost_snapshot.get("period_days") != modeled_days_per_month:
+        return None
+    return apply_azure_runtime_cost_to_modeled_economics(
+        modeled_business_economics=modeled_business_economics,
+        azure_runtime_cost={
+            "allocated_azure_runtime_cost_usd": cost_snapshot[
+                "allocated_azure_runtime_cost_usd"
+            ],
+            "cost_period": cost_snapshot["cost_period"],
+            "cost_source": cost_snapshot["evidence_source"],
+            "allocation_status": cost_snapshot["allocation_status"],
+        },
+    )
 
 
 def _status_scope_row(dimension: str, status, scope) -> dict:

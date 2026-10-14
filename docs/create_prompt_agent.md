@@ -1,4 +1,12 @@
-# Create the Contoso Coffee Prompt Agent in Foundry
+---
+title: Create the Contoso Coffee Prompt Agent
+description: Setup guide for the Foundry Prompt Agent and Azure AI Search connection.
+---
+
+## Create the Contoso Coffee Prompt Agent in Foundry
+
+> Implementation reference. See the [README](../README.md) and
+> [architecture overview](architecture.md) for the current framework.
 
 This repository assumes a Prompt Agent already exists in your Microsoft Foundry project, backed by an Azure AI Search index built from the Contoso Coffee menu. Nothing in this repo creates that agent, because the agent's instructions, model, and tools are owned by Foundry rather than by source control.
 

@@ -1,4 +1,12 @@
-# AUTOMATE — Scheduled Regression + CI/CD Gates
+---
+title: Automate Agent Evaluation
+description: Implementation reference for scheduled evaluation and CI quality gates.
+---
+
+## AUTOMATE — Scheduled Regression + CI/CD Gates
+
+> Implementation reference. See the [README](../README.md) and
+> [architecture overview](architecture.md) for the current framework.
 
 ## Purpose
 

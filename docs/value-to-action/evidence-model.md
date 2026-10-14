@@ -1,4 +1,9 @@
-# Evidence Model
+---
+title: Value-to-Action Evidence Model
+description: Compact reference for evidence scope and economic contracts.
+---
+
+## Evidence Model
 
 Compact technical reference for the Value-to-Action evidence contracts.
 
@@ -32,10 +37,11 @@ A completed response is not automatically useful work. Failed work remains in th
 
 ## Execution Cost
 
-Keep three boundaries distinct:
+Keep four cost boundaries distinct:
 
 ```text
-Model Cost → Full Execution Cost → Total Relevant Customer Cost
+Model Cost → Azure Runtime Cost → Full Technical Execution Cost
+                                      → Total Relevant Customer Cost
 ```
 
 A precise partial number is still partial.
@@ -68,6 +74,7 @@ Modeled:
 
 ```text
 modeled recovered contribution / measured model inference cost = Modeled AI Value Multiple
+modeled recovered contribution / allocated Azure runtime cost = Modeled Azure Runtime Value Multiple
 ```
 
 Evidence-backed:
@@ -83,6 +90,8 @@ incremental economic value - Total Relevant Customer Cost = Customer Net Economi
 ```
 
 Value and cost must share the same population, period, and workload scope.
+The two modeled multiples are separate lenses; do not sum their denominators
+without evidence that they do not overlap.
 
 ## Incremental / next-dollar economics
 
