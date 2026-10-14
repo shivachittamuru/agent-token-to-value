@@ -344,6 +344,47 @@ No FinOps Toolkit integration is included. Both runners use the same optional
 local snapshot and monthly-basis guard; synthetic and incremental economics are
 unchanged.
 
+## Cost-source adapters
+
+The Azure Cost Management API adapter and the local
+[FOCUS Cost and Usage adapter](../src/foundry_prompt_agent/focus_cost.py)
+normalize resource observations into the same period, source, and resource
+evidence contract. Both then use the existing allocation builder and
+`summarize_azure_runtime_cost`; snapshots, run artifacts, and dashboards do
+not need source-specific economics logic.
+
+The FOCUS spike reads a CSV subset of FOCUS 1.2 fields:
+`ResourceId`, `BillingCurrency`, `BillingPeriodStart`, `BillingPeriodEnd`,
+`EffectiveCost`, and `BilledCost`. It uses the configured resource-ID
+allow-list, aggregates repeated rows per resource, and ignores null or
+non-allow-listed resource IDs. Other FOCUS fields, including `ResourceName`,
+`ServiceName`, `ServiceCategory`, `ProviderName`, and `ChargeCategory`, are
+not required for allocation.
+
+`EffectiveCost` is the default economic basis because it accounts for
+amortization after discounts and applicable prepaid commitments. Select
+`billed_cost` explicitly when an invoice-oriented basis is needed. The selected
+metric and FOCUS version remain in source provenance; the adapter never falls
+back to the other metric. The September repository fixture contains identical
+EffectiveCost and BilledCost amounts as a simplifying example. That does not
+imply the metrics are generally equivalent.
+
+The fixture at
+[contoso-september-2026.csv](../focus_samples/contoso-september-2026.csv)
+is a deterministic test/demo dataset derived from already validated September
+evidence, not a fresh Azure export. It demonstrates aggregation and parity,
+not a new billing observation. Run the read-only adapter with:
+
+```powershell
+uv run python scripts\read_focus_runtime_cost.py --input focus_samples\contoso-september-2026.csv --month 2026-09
+```
+
+Add `--cost-metric billed_cost` to select the billed basis, or
+`--save-snapshot` to persist a separately named FOCUS snapshot that the
+existing snapshot loader and dashboards can read. No Azure access is needed.
+This establishes a source-adapter pattern, not full multi-cloud portability
+or support for every FOCUS 1.2 column.
+
 ## Dashboard views
 
 The Token-to-Value dashboard offers a local snapshot selector in its sidebar.

@@ -80,7 +80,10 @@ def build_azure_runtime_cost_config(
     evidence = _mapping(cost_evidence, "cost_evidence")
     _period(_required(evidence, "period"))
     _source(_required(evidence, "source"))
-    is_api_evidence = evidence["source"]["type"] == "azure_cost_management_api"
+    is_query_evidence = evidence["source"]["type"] in (
+        "azure_cost_management_api",
+        "focus_cost_and_usage",
+    )
     observations = _required(evidence, "resources")
     if not isinstance(observations, list):
         raise ValueError("cost_evidence.resources must be a list")
@@ -113,7 +116,7 @@ def build_azure_runtime_cost_config(
         elif status == "not_returned":
             if observation.get("actual_cost_usd") is not None:
                 raise ValueError(f"{name}: not_returned cannot have an actual cost")
-            if is_api_evidence:
+            if is_query_evidence:
                 observation = {
                     **observation,
                     **missing_azure_resource_cost_evidence(allowed[name]),
@@ -134,7 +137,7 @@ def build_azure_runtime_cost_config(
         resource.pop("cost_evidence_status", None)
         observation = by_name.get(resource["name"])
         if observation is None:
-            if is_api_evidence:
+            if is_query_evidence:
                 resource.update(missing_azure_resource_cost_evidence(resource))
             else:
                 resource["actual_cost_usd"] = None
@@ -360,14 +363,27 @@ def _period(value: object) -> tuple[dict, int]:
 
 def _source(value: object) -> dict:
     source = _mapping(value, "source")
-    if _required(source, "type") not in (
-        "azure_cost_management_manual", "azure_cost_management_api"
+    source_type = _required(source, "type")
+    if source_type in (
+        "azure_cost_management_manual",
+        "azure_cost_management_api",
     ):
-        raise ValueError("source.type must identify manual or API Cost Management evidence")
-    expected = {
-        "cost_basis": "actual_cost",
-        "evidence_status": "observed_billing",
-    }
+        expected = {
+            "cost_basis": "actual_cost",
+            "evidence_status": "observed_billing",
+        }
+    elif source_type == "focus_cost_and_usage":
+        cost_basis = _required(source, "cost_basis")
+        if cost_basis not in ("effective_cost", "billed_cost"):
+            raise ValueError(
+                "FOCUS source.cost_basis must be effective_cost or billed_cost"
+            )
+        if _required(source, "cost_metric") != cost_basis:
+            raise ValueError("FOCUS source.cost_metric must match cost_basis")
+        _text(_required(source, "focus_version"), "source.focus_version")
+        expected = {"evidence_status": "observed_billing"}
+    else:
+        raise ValueError("source.type must identify supported cost evidence")
     for field, expected_value in expected.items():
         if _required(source, field) != expected_value:
             raise ValueError(f"source.{field} must be {expected_value}")

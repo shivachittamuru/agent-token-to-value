@@ -186,7 +186,7 @@ def _render_prove(summary: dict, simulation: bool) -> None:
         yaxis_title="SIMULATED conversion rate",
         showlegend=False,
     )
-    st.plotly_chart(figure, use_container_width=True)
+    st.plotly_chart(figure, width='stretch')
     st.caption("Evidence: **SYNTHETIC SIMULATION** — this is a simulated lift, not realized or production lift.")
     st.divider()
 
@@ -371,7 +371,7 @@ def _render_explorer(interactions: list[dict]) -> None:
             if (not category_filter or row["category"] in category_filter)
             and (not assignment_filter or row["assignment"] in assignment_filter)
         ]
-        st.dataframe(filtered, use_container_width=True)
+        st.dataframe(filtered, width='stretch')
         st.caption(
             "For simulation runs, control rows are shadow executions "
             "(exposure = ai_not_exposed_shadow_execution_only)."
