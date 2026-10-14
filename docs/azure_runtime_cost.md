@@ -340,6 +340,32 @@ does not establish complete customer-cost evidence.
 
 The numerator remains modeled. These outputs do not establish realized
 contribution, ROI, incremental economics, or Customer Net Economic Value.
-No FinOps Toolkit integration or dashboard changes are included. Both runners
-use the same optional local snapshot and monthly-basis guard; synthetic and
-incremental economics are unchanged.
+No FinOps Toolkit integration is included. Both runners use the same optional
+local snapshot and monthly-basis guard; synthetic and incremental economics are
+unchanged.
+
+## Dashboard views
+
+The Token-to-Value dashboard offers a local snapshot selector in its sidebar.
+It validates compatible `cost_snapshots/*.json` files for the Contoso workload
+and makes no Azure calls. No snapshot is selected by default. When the scenario
+month length matches the selected snapshot, the dashboard shows the modeled
+Azure Runtime Value Multiple as the system-level metric, with allocated Azure
+runtime cost and contribution after runtime. The existing AI Value Multiple
+remains a separate inference-only metric. Scenario changes affect the modeled
+contribution, while the selected monthly Azure cost remains fixed. A workload
+or month-length mismatch leaves system economics unavailable.
+
+The contribution chart shows recovered contribution beside Azure runtime and
+inference costs when a compatible snapshot is selected. Conversion sensitivity
+plots the Azure Runtime Value Multiple and retains the AI Value Multiple as a
+separate line. Run-to-run comparisons remain inference-only and do not include
+period-level Azure cost.
+
+The Value-to-Action dashboard reads the already-stored
+`azure_runtime_cost` and `azure_runtime_modeled_economics` fields from each run
+summary. It displays those values without recalculating them. Older runs
+without these fields continue to show system economics as unavailable, while
+their model, synthetic, customer, and decision sections retain their existing
+meaning. Neither dashboard turns Azure runtime cost into Total Relevant
+Customer Cost or establishes customer net economic value.

@@ -328,6 +328,98 @@ def test_presentation_does_not_recalculate_values():
     assert value["decision_grade"]["incremental_net_economic_value_usd"] is None
 
 
+def test_value_view_passes_through_stored_runtime_economics():
+    summary = regression_summary()
+    summary["azure_runtime_cost"] = {
+        "actual_selected_resource_cost_usd": 246.06188160724,
+        "allocated_azure_runtime_cost_usd": 52.52588160724,
+        "allocation_status": "partially_allocated",
+        "cost_period": {
+            "start": "2026-09-01",
+            "end": "2026-09-30",
+            "currency": "USD",
+        },
+    }
+    summary["azure_runtime_modeled_economics"] = {
+        "modeled_contribution_after_azure_runtime_usd": 1648.47411839276,
+        "modeled_azure_runtime_value_multiple": 32.384,
+        "allocated_azure_runtime_cost_usd": 52.52588160724,
+        "allocation_status": "partially_allocated",
+        "cost_period": {"start": "2026-09-01", "end": "2026-09-30"},
+    }
+
+    value = views.value_view(summary)
+
+    assert value["azure_runtime"]["available"] is True
+    assert value["azure_runtime"]["allocated_azure_runtime_cost_usd"] == 52.52588160724
+    assert (
+        value["azure_runtime"]["modeled_contribution_after_azure_runtime_usd"]
+        == 1648.47411839276
+    )
+    assert value["modeled"]["ai_value_multiple"] == 134.7
+    assert value["decision_grade"]["customer_net_economic_value_usd"] is None
+    assert value["decision_grade"]["incremental_net_economic_value_usd"] is None
+
+
+def test_scenario_runtime_economics_uses_fixed_snapshot_and_preserves_model_multiple():
+    scenario = {
+        "recovered_contribution_per_month": 1701.0,
+        "ai_inference_cost_per_month": 11.07324,
+        "ai_value_multiple": 153.6,
+    }
+    snapshot = {
+        "workload_id": "contoso-demand-recovery",
+        "period_days": 30,
+        "allocated_azure_runtime_cost_usd": 52.52588160724,
+        "cost_period": {
+            "start": "2026-09-01",
+            "end": "2026-09-30",
+            "currency": "USD",
+        },
+        "evidence_source": {
+            "type": "azure_cost_management_api",
+            "cost_basis": "actual_cost",
+            "evidence_status": "observed_billing",
+        },
+        "allocation_status": "partially_allocated",
+    }
+
+    result = views.scenario_runtime_economics(
+        modeled_business_economics=scenario,
+        cost_snapshot=snapshot,
+        workload_id="contoso-demand-recovery",
+        modeled_days_per_month=30,
+    )
+
+    assert result["modeled_contribution_after_azure_runtime_usd"] == pytest.approx(
+        1701.0 - 52.52588160724
+    )
+    assert result["modeled_azure_runtime_value_multiple"] == pytest.approx(
+        1701.0 / 52.52588160724
+    )
+    assert scenario["ai_value_multiple"] == 153.6
+    assert scenario["ai_inference_cost_per_month"] == 11.07324
+
+
+@pytest.mark.parametrize(
+    ("workload_id", "days_per_month"),
+    [("another-workload", 30), ("contoso-demand-recovery", 31)],
+)
+def test_scenario_runtime_economics_rejects_incompatible_snapshot(
+    workload_id, days_per_month
+):
+    snapshot = {
+        "workload_id": "contoso-demand-recovery",
+        "period_days": 30,
+    }
+    assert views.scenario_runtime_economics(
+        modeled_business_economics={"recovered_contribution_per_month": 100},
+        cost_snapshot=snapshot,
+        workload_id=workload_id,
+        modeled_days_per_month=days_per_month,
+    ) is None
+
+
 def test_decide_actions_flags_scale_ineligible():
     actions = views.decide_actions(regression_summary())
 

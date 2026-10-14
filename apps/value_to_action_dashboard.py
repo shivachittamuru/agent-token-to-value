@@ -11,6 +11,8 @@ from the stored ``summary.json`` / ``interactions.jsonl`` via pure helpers.
 
 from __future__ import annotations
 
+from datetime import date
+
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -31,6 +33,17 @@ def _money(value) -> str:
 
 def _pct(value) -> str:
     return f"{value:.1%}" if isinstance(value, (int, float)) else "—"
+
+
+def _cost_period_label(period: dict | None) -> str:
+    if not period:
+        return "—"
+    try:
+        start = date.fromisoformat(period["start"])
+        end = date.fromisoformat(period["end"])
+    except (KeyError, TypeError, ValueError):
+        return "—"
+    return f"{start.strftime('%b')} {start.day}–{end.day}, {end.year}"
 
 
 def main() -> None:
@@ -182,24 +195,59 @@ def _render_value(summary: dict) -> None:
     st.subheader("VALUE")
     value = views.value_view(summary)
 
-    st.markdown("**A. Modeled scenario economics (MODELED)**")
     modeled = value["modeled"]
-    columns = st.columns(3)
-    columns[0].metric(
+    runtime = value["azure_runtime"]
+    st.markdown("**A. SYSTEM ECONOMICS (MODELED + OBSERVED/ALLOCATED COST)**")
+    if runtime is not None and runtime["available"]:
+        columns = st.columns(3)
+        columns[0].metric(
+            "Allocated Azure runtime cost",
+            _money(runtime["allocated_azure_runtime_cost_usd"]),
+        )
+        columns[1].metric(
+            "Modeled contribution after Azure runtime",
+            _money(runtime["modeled_contribution_after_azure_runtime_usd"]),
+        )
+        columns[2].metric(
+            "Modeled Azure Runtime Value Multiple",
+            f"{runtime['modeled_azure_runtime_value_multiple']:,.1f}x",
+            help="Primary system-economics multiple when compatible cost evidence is available.",
+        )
+        st.caption(
+            f"Cost period: {_cost_period_label(runtime['cost_period'])} · "
+            f"Allocation status: {(runtime['allocation_status'] or 'unknown').replace('_', ' ').upper()}"
+        )
+        st.caption(
+            "Broader technical cost boundary using observed Azure billing plus "
+            "workload allocation. Numerator remains modeled business contribution."
+        )
+    else:
+        st.info("NOT AVAILABLE - no compatible Azure cost snapshot")
+    st.caption(
+        "Azure system economics are broader than inference economics but still "
+        "narrower than Total Relevant Customer Cost."
+    )
+
+    st.markdown("**B. MODEL ECONOMICS (MODELED, INFERENCE-ONLY)**")
+    model_columns = st.columns(3)
+    model_columns[0].metric(
         "Modeled recovered contribution", _money(modeled["recovered_contribution_usd"])
     )
+    model_columns[1].metric(
+        "Projected inference cost/month", _money(modeled["inference_cost_usd"])
+    )
     multiple = modeled["ai_value_multiple"]
-    columns[1].metric(
-        "Modeled AI Value Multiple",
+    model_columns[2].metric(
+        "Modeled AI Value Multiple (inference-only)",
         f"{multiple:,.1f}x" if isinstance(multiple, (int, float)) else "—",
     )
-    columns[2].metric(
-        "Cost completeness", (modeled["cost_completeness"] or "—").upper()
+    st.caption(
+        "Inference-only metric remains separate from Azure runtime economics."
     )
 
     synthetic = value["synthetic"]
     if synthetic is not None:
-        st.markdown("**B. Synthetic economics (SIMULATED)**")
+        st.markdown("**C. Synthetic economics (SIMULATED)**")
         columns = st.columns(3)
         columns[0].metric(
             "Simulated incremental conversion",
@@ -224,7 +272,7 @@ def _render_value(summary: dict) -> None:
         )
         st.caption("Every value above is **SIMULATED**, not production-established.")
 
-    st.markdown("**C. Decision-grade economics**")
+    st.markdown("**D. Customer / decision-grade economics**")
     decision = value["decision_grade"]
     net = decision["customer_net_economic_value_usd"]
     incremental = decision["incremental_net_economic_value_usd"]

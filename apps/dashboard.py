@@ -11,15 +11,22 @@ locally with summarize_business_economics().
 from __future__ import annotations
 
 import json
+from datetime import date
+from pathlib import Path
 
 import plotly.graph_objects as go
 import streamlit as st
 
+from foundry_prompt_agent import dashboard_views
 from foundry_prompt_agent import history
 from foundry_prompt_agent.business_economics import (
     conversion_sensitivity,
     scenario_from_measured_run,
 )
+from foundry_prompt_agent.cost_snapshot import load_cost_snapshot
+
+COST_SNAPSHOTS_DIR = Path("cost_snapshots")
+WORKLOAD_ID = "contoso-demand-recovery"
 
 
 PRESETS = {
@@ -104,26 +111,42 @@ def calculate_scenario(measured: dict, controls: dict) -> dict:
     )
 
 
-def contribution_vs_cost_chart(scenario: dict) -> go.Figure:
+def contribution_vs_cost_chart(
+    scenario: dict, runtime_economics: dict | None = None
+) -> go.Figure:
+    labels = ["Recovered contribution", "AI inference cost"]
+    values = [
+        scenario["recovered_contribution_per_month"],
+        scenario["ai_inference_cost_per_month"],
+    ]
+    if runtime_economics is not None:
+        labels = [
+            "Recovered contribution",
+            "Azure runtime cost",
+            "AI inference cost",
+        ]
+        values = [
+            scenario["recovered_contribution_per_month"],
+            runtime_economics["allocated_azure_runtime_cost_usd"],
+            scenario["ai_inference_cost_per_month"],
+        ]
     fig = go.Figure(
         data=[
             go.Bar(
-                x=["Recovered contribution", "AI inference cost"],
-                y=[
-                    scenario["recovered_contribution_per_month"],
-                    scenario["ai_inference_cost_per_month"],
-                ],
-                text=[
-                    money(scenario["recovered_contribution_per_month"]),
-                    money(scenario["ai_inference_cost_per_month"]),
-                ],
+                x=labels,
+                y=values,
+                text=[money(value) for value in values],
                 textposition="auto",
             )
         ]
     )
 
     fig.update_layout(
-        title="Monthly Contribution vs. AI Inference Cost",
+        title=(
+            "Monthly Modeled Contribution vs Technical Cost Boundaries"
+            if runtime_economics is not None
+            else "Monthly Contribution vs. AI Inference Cost"
+        ),
         yaxis_title="USD / month",
         showlegend=False,
         height=390,
@@ -132,7 +155,11 @@ def contribution_vs_cost_chart(scenario: dict) -> go.Figure:
     return fig
 
 
-def conversion_sensitivity_chart(measured: dict, controls: dict) -> go.Figure:
+def conversion_sensitivity_chart(
+    measured: dict,
+    controls: dict,
+    cost_snapshot: dict | None = None,
+) -> go.Figure:
     """Vary only conversion while holding the measured AI run fixed."""
     conversion_rates = [index / 100 for index in range(0, 51)]
 
@@ -143,22 +170,51 @@ def conversion_sensitivity_chart(measured: dict, controls: dict) -> go.Figure:
         cost_stress_multiplier=controls["cost_stress_multiplier"],
     )
 
-    value_multiples = [
+    inference_multiples = [
         scenario["ai_value_multiple"] for scenario in scenarios
     ]
 
     selected_conversion_rate = controls["conversion_rate"]
 
     fig = go.Figure()
+    runtime_multiples = None
+    if cost_snapshot is not None:
+        runtime_scenarios = [
+            dashboard_views.scenario_runtime_economics(
+                modeled_business_economics=scenario,
+                cost_snapshot=cost_snapshot,
+                workload_id=WORKLOAD_ID,
+                modeled_days_per_month=controls["days_per_month"],
+            )
+            for scenario in scenarios
+        ]
+        if all(item is not None for item in runtime_scenarios):
+            runtime_multiples = [
+                item["modeled_azure_runtime_value_multiple"]
+                for item in runtime_scenarios
+            ]
+            fig.add_trace(
+                go.Scatter(
+                    x=[rate * 100 for rate in conversion_rates],
+                    y=runtime_multiples,
+                    mode="lines+markers",
+                    name="Azure Runtime Value Multiple",
+                    hovertemplate=(
+                        "Conversion: %{x:.0f}%<br>"
+                        "Azure Runtime Value Multiple: %{y:.1f}x"
+                        "<extra></extra>"
+                    ),
+                )
+            )
     fig.add_trace(
         go.Scatter(
             x=[rate * 100 for rate in conversion_rates],
-            y=value_multiples,
+            y=inference_multiples,
             mode="lines+markers",
-            name="AI Value Multiple",
+            name="AI Value Multiple - inference only",
             hovertemplate=(
                 "Conversion: %{x:.0f}%<br>"
-                "AI Value Multiple: %{y:.1f}x"
+                "AI Value Multiple (inference only): %{y:.1f}x"
                 "<extra></extra>"
             ),
         )
@@ -179,9 +235,16 @@ def conversion_sensitivity_chart(measured: dict, controls: dict) -> go.Figure:
     )
 
     fig.update_layout(
-        title="Sensitivity: AI Value Multiple vs. Conversion Rate",
+        title=(
+            "Sensitivity: Azure Runtime and AI Value Multiples vs. Conversion Rate"
+            if runtime_multiples is not None
+            else "Sensitivity: AI Value Multiple vs. Conversion Rate"
+        ),
         xaxis_title="Conversion rate (%)",
-        yaxis_title="AI Value Multiple",
+        yaxis_title=(
+            "Modeled value multiple"
+            if runtime_multiples is not None else "AI Value Multiple"
+        ),
         height=390,
         margin=dict(l=20, r=20, t=55, b=20),
     )
@@ -399,12 +462,88 @@ def render_scenario_controls(latest: dict) -> dict:
     }
 
 
-def render_business_economics(latest: dict, controls: dict) -> None:
+def _snapshot_period_label(snapshot: dict) -> str:
+    period = snapshot["cost_period"]
+    start = date.fromisoformat(period["start"])
+    end = date.fromisoformat(period["end"])
+    return f"{start.strftime('%b')} {start.day}-{end.day}, {end.year}"
+
+
+def load_available_cost_snapshots(
+    directory: Path = COST_SNAPSHOTS_DIR,
+) -> tuple[dict[str, tuple[Path, dict]], list[str]]:
+    """Read validated, workload-compatible snapshots; never contact Azure."""
+    snapshots = {}
+    errors = []
+    duplicate_ids = set()
+    if not directory.exists():
+        return snapshots, errors
+    for path in sorted(directory.glob("*.json")):
+        try:
+            snapshot = load_cost_snapshot(path, workload_id=WORKLOAD_ID)
+        except (OSError, ValueError) as error:
+            errors.append(f"{path.name}: {error}")
+            continue
+        if snapshot["snapshot_id"] in snapshots:
+            errors.append(
+                f"{path.name}: duplicate snapshot_id {snapshot['snapshot_id']!r}"
+            )
+            snapshots.pop(snapshot["snapshot_id"], None)
+            duplicate_ids.add(snapshot["snapshot_id"])
+            continue
+        if snapshot["snapshot_id"] in duplicate_ids:
+            errors.append(
+                f"{path.name}: duplicate snapshot_id {snapshot['snapshot_id']!r}"
+            )
+            continue
+        snapshots[snapshot["snapshot_id"]] = (path, snapshot)
+    return snapshots, errors
+
+
+def render_cost_snapshot_selector() -> dict | None:
+    snapshots, errors = load_available_cost_snapshots()
+    with st.sidebar:
+        st.divider()
+        st.subheader("Azure system cost")
+        selected_id = st.selectbox(
+            "Cost snapshot",
+            options=[None, *snapshots],
+            format_func=lambda value: value or "No Azure cost snapshot",
+        )
+        for error in errors:
+            st.warning(f"Snapshot unavailable: {error}")
+        if selected_id is None:
+            st.caption("System economics: NOT AVAILABLE")
+            return None
+        _, snapshot = snapshots[selected_id]
+        st.caption(f"Period: {_snapshot_period_label(snapshot)}")
+        st.caption(
+            "Allocated Azure runtime cost: "
+            f"{money(snapshot['allocated_azure_runtime_cost_usd'])}"
+        )
+        st.caption(
+            f"Allocation status: {snapshot['allocation_status'].replace('_', ' ').upper()}"
+        )
+    return snapshot
+
+
+def render_business_economics(
+    latest: dict, controls: dict, cost_snapshot: dict | None = None
+) -> None:
     render_measured_performance(latest)
 
     st.subheader("Demand-Recovery Funnel")
 
     scenario = calculate_scenario(latest, controls)
+    runtime_economics = (
+        dashboard_views.scenario_runtime_economics(
+            modeled_business_economics=scenario,
+            cost_snapshot=cost_snapshot,
+            workload_id=WORKLOAD_ID,
+            modeled_days_per_month=controls["days_per_month"],
+        )
+        if cost_snapshot is not None else None
+    )
 
     cols = st.columns(4)
     cols[0].metric(
@@ -430,28 +569,75 @@ def render_business_economics(latest: dict, controls: dict) -> None:
 
     st.subheader("Estimated Economics")
 
-    cols = st.columns(4)
-    cols[0].metric(
-        "Recovered revenue / month",
-        money(scenario["recovered_revenue_per_month"]),
-        border=True,
-    )
-    cols[1].metric(
-        "Recovered contribution / month",
-        money(scenario["recovered_contribution_per_month"]),
-        border=True,
-    )
-    cols[2].metric(
-        "AI inference cost / month",
-        money(scenario["ai_inference_cost_per_month"]),
-        border=True,
-    )
-    cols[3].metric(
-        "AI Value Multiple",
-        f"{scenario['ai_value_multiple']:,.1f}x",
-        border=True,
-        help="Recovered contribution divided by AI inference cost.",
-    )
+    if runtime_economics is not None:
+        st.markdown("#### SYSTEM ECONOMICS - broader Azure operating boundary")
+        system_cols = st.columns(3)
+        system_cols[0].metric(
+            "Modeled Azure Runtime Value Multiple",
+            f"{runtime_economics['modeled_azure_runtime_value_multiple']:,.1f}x",
+            border=True,
+            help="Primary system-economics multiple using the selected period-level cost snapshot.",
+        )
+        system_cols[1].metric(
+            "Allocated Azure runtime cost / month",
+            money(runtime_economics["allocated_azure_runtime_cost_usd"]),
+            border=True,
+        )
+        system_cols[2].metric(
+            "Contribution after Azure runtime",
+            money(runtime_economics["modeled_contribution_after_azure_runtime_usd"]),
+            border=True,
+        )
+        st.caption(
+            "Includes allocated Azure Search, Foundry/model runtime, and observability. "
+            "The selected snapshot is a fixed monthly cost baseline while scenario assumptions change."
+        )
+        st.markdown("#### MODEL ECONOMICS - inference-only lens")
+        model_cols = st.columns(3)
+        model_cols[0].metric(
+            "Modeled recovered contribution / month",
+            money(scenario["recovered_contribution_per_month"]),
+            border=True,
+        )
+        model_cols[1].metric(
+            "Projected inference cost / month",
+            money(scenario["ai_inference_cost_per_month"]),
+            border=True,
+        )
+        model_cols[2].metric(
+            "Modeled AI Value Multiple - inference only",
+            f"{scenario['ai_value_multiple']:,.1f}x",
+            border=True,
+            help="Secondary inference-efficiency metric; its denominator remains projected inference cost only.",
+        )
+        st.caption(
+            f"Scenario analysis against {_snapshot_period_label(cost_snapshot)} "
+            "observed/allocated monthly cost. This is not a per-run Azure cost."
+        )
+    else:
+        cols = st.columns(4)
+        cols[0].metric(
+            "Recovered revenue / month",
+            money(scenario["recovered_revenue_per_month"]),
+            border=True,
+        )
+        cols[1].metric(
+            "Recovered contribution / month",
+            money(scenario["recovered_contribution_per_month"]),
+            border=True,
+        )
+        cols[2].metric(
+            "AI inference cost / month",
+            money(scenario["ai_inference_cost_per_month"]),
+            border=True,
+        )
+        cols[3].metric(
+            "Modeled AI Value Multiple",
+            f"{scenario['ai_value_multiple']:,.1f}x",
+            border=True,
+            help="Recovered contribution divided by AI inference cost.",
+        )
+        st.info("System economics: NOT AVAILABLE - no compatible Azure cost snapshot.")
 
     cols = st.columns(3)
     cols[0].metric(
@@ -474,27 +660,39 @@ def render_business_economics(latest: dict, controls: dict) -> None:
 
     with left:
         st.plotly_chart(
-            contribution_vs_cost_chart(scenario),
+            contribution_vs_cost_chart(scenario, runtime_economics),
             width="stretch",
         )
 
     with right:
         st.plotly_chart(
-            conversion_sensitivity_chart(latest, controls),
+            conversion_sensitivity_chart(
+                latest,
+                controls,
+                cost_snapshot if runtime_economics is not None else None,
+            ),
             width="stretch",
         )
 
     st.subheader("Interpretation")
 
-    if scenario["ai_value_multiple"] >= 1:
+    multiple_to_interpret = (
+        runtime_economics["modeled_azure_runtime_value_multiple"]
+        if runtime_economics is not None else scenario["ai_value_multiple"]
+    )
+    multiple_name = (
+        "Modeled Azure Runtime Value Multiple"
+        if runtime_economics is not None else "Modeled AI Value Multiple"
+    )
+    if multiple_to_interpret >= 1:
         st.success(
             "Under the selected assumptions, modeled recovered contribution "
-            "exceeds AI inference cost."
+            f"exceeds the denominator for {multiple_name}."
         )
     else:
         st.warning(
             "Under the selected assumptions, modeled recovered contribution "
-            "does not cover AI inference cost."
+            f"does not cover the denominator for {multiple_name}."
         )
 
     st.markdown(
@@ -733,13 +931,14 @@ def main() -> None:
 
     initialize_scenario_state(latest)
     controls = render_scenario_controls(latest)
+    cost_snapshot = render_cost_snapshot_selector()
 
     business_tab, comparison_tab = st.tabs(
         ["Business Economics", "Agent / Run Comparison"]
     )
 
     with business_tab:
-        render_business_economics(latest, controls)
+        render_business_economics(latest, controls, cost_snapshot)
 
     with comparison_tab:
         render_agent_comparison(runs, controls)
