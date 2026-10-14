@@ -1,9 +1,10 @@
 """Pure presentation helpers for the Value-to-Action dashboard.
 
-These functions only map already-stored run-package fields into display-ready
-structures. They never recalculate economics or decision logic, never call the
-agent/Azure/Foundry, and never invent values: missing optional fields render as
-Unknown / unavailable, and Unknown statuses do not get a fabricated scope.
+These functions map stored run-package fields into display-ready structures.
+The scenario helper delegates runtime-economics arithmetic to the established
+pure helper. No function calls the agent/Azure/Foundry or invents values:
+missing optional fields remain unavailable, and Unknown statuses do not get a
+fabricated scope.
 """
 
 from __future__ import annotations

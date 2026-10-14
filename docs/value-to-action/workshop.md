@@ -1,4 +1,12 @@
-# Value-to-Action Workshop
+---
+title: Value-to-Action Workshop
+description: A short workshop for tracing AI evidence to a supported action.
+---
+
+## Value-to-Action Workshop
+
+> Workshop reference. See the [README](../../README.md) and
+> [architecture overview](../architecture.md) for the current framework.
 
 This workshop is designed to be **run**, not read like a textbook.
 
@@ -50,7 +58,8 @@ Ask: **What is measured directly, and what remains missing?**
 
 ```text
 response ≠ Accepted Work
-model cost ≠ full execution cost ≠ Total Customer Cost
+Model Cost → Azure Runtime Cost → Full Technical Execution Cost
+                                      → Total Relevant Customer Cost
 ```
 
 ### 2. PROVE
@@ -69,6 +78,14 @@ Current:
 
 ```text
 scenario assumptions × measured technical behavior → modeled economics
+```
+
+Keep the cost lenses distinct:
+
+```text
+Modeled AI Value Multiple          → inference-only
+Modeled Azure Runtime Value Multiple → allocated technical runtime cost
+Customer economics                 → not established
 ```
 
 Decision-grade target:

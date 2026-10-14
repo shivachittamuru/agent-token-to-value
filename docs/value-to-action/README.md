@@ -1,4 +1,12 @@
-# Value-to-Action
+---
+title: Value-to-Action
+description: Evidence-based progression from AI consumption to a justified business action.
+---
+
+## Value-to-Action
+
+> Current framework. See the repository [architecture overview](../architecture.md)
+> for system and cost-source boundaries.
 
 A compact framework for moving from **AI consumption** to an **evidence-backed business action**.
 
@@ -53,6 +61,16 @@ modeled recovered contribution / measured model inference cost
 ```
 
 It is useful for opportunity sizing. It is **not realized ROI**.
+
+When a compatible monthly cost snapshot exists, the separate system lens is:
+
+```text
+modeled recovered contribution / allocated Azure runtime cost
+= Modeled Azure Runtime Value Multiple
+```
+
+This broader technical boundary remains modeled and does not establish
+Customer Net Economic Value. Keep it separate from the inference-only multiple.
 
 Stronger economics require:
 

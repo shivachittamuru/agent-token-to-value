@@ -1,5 +1,10 @@
-# AI Value Loop
-## From Tokens → Verified Outcomes → Business Value → Action
+---
+title: AI Value Loop
+description: An executive-oriented view of AI work, economics, and investment action.
+---
+
+## AI Value Loop
+### From Tokens to Verified Outcomes, Business Value, and Action
 
 ### Purpose
 Create a common language for AI profitability that works across technical, business, and partner teams.
@@ -43,6 +48,15 @@ Business Outcome
     ↓
 Economic Value
 ```
+
+Economic value keeps three boundaries distinct:
+
+```text
+Model economics → System economics → Customer economics
+```
+
+The system lens uses allocated Azure runtime cost; it does not replace the
+inference-only lens or establish complete customer economics.
 
 **Token-to-Value asks:** *What are we getting for the AI resources we consume?*
 
@@ -89,7 +103,7 @@ SPEND → WORK → VALUE → DECIDE → CAPITAL
 - **Cost per Useful Work** — Cost to create one accepted unit of work.
 - **Business Outcome** — What changed outside the AI system.
 - **Attributable Value** — Economic value credibly connected to the AI workload.
-- **Total Customer Cost** — Relevant end-to-end cost of operating the workload, not just model cost.
+- **Total Relevant Customer Cost** — Relevant end-to-end cost of operating the workload, not just model or Azure runtime cost.
 - **Net Economic Value** — Attributable Value − Total Relevant Customer Cost.
 - **Next-Dollar Economics** — Value and cost of the next proposed increment, not the historical workload.
 - **Evidence Confidence** — How strongly the current claim is supported.

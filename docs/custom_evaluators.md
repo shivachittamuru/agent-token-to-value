@@ -1,4 +1,12 @@
-# Custom Evaluators for the Contoso Coffee Agent
+---
+title: Custom Evaluators for Contoso Coffee
+description: Implementation reference for the project's Foundry custom evaluators.
+---
+
+## Custom Evaluators for the Contoso Coffee Agent
+
+> Implementation reference. See the [README](../README.md) and
+> [architecture overview](architecture.md) for the current framework.
 
 This document explains the two custom evaluators used by the project:
 

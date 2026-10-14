@@ -83,7 +83,7 @@ def main() -> None:
     _render_header(meta, simulation)
     _render_journey(summary)
     _render_measure(summary, interactions)
-    _render_prove(summary, simulation)
+    _render_prove(summary)
     _render_value(summary)
     _render_test(summary)
     _render_decide(summary)
@@ -149,7 +149,7 @@ def _render_measure(summary: dict, interactions: list[dict]) -> None:
     st.divider()
 
 
-def _render_prove(summary: dict, simulation: bool) -> None:
+def _render_prove(summary: dict) -> None:
     st.subheader("PROVE")
     experiment = views.prove_view(summary)
 

@@ -1,4 +1,12 @@
-# Monitoring Microsoft Foundry Agents
+---
+title: Monitoring Microsoft Foundry Agents
+description: Implementation reference for Foundry agent operations and quality monitoring.
+---
+
+## Monitoring Microsoft Foundry Agents
+
+> Implementation reference. See the [README](../README.md) and
+> [architecture overview](architecture.md) for the current framework.
 
 ## Purpose
 
